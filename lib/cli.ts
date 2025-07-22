@@ -54,7 +54,7 @@ if (args.length === 0) {
 }
 
 // Add the CDK app entry point to all commands
-const cdkArgs = ['-a', 'dist/lib/bin/cdk.js', ...args];
+const cdkArgs = ['-a', 'dist/bin/cdk.js', ...args];
 
 // Spawn CDK process
 const cdkProcess = spawn('cdk', cdkArgs, {

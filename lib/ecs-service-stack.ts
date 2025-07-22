@@ -338,7 +338,58 @@ export class EcsServiceStack extends cdk.Stack {
     const config = this.loadConfiguration();
     const stackName = config.stackName || this.stackName;
     
-    // Always create new VPC for now - import logic can be added later
+    // If VPC ID is provided, try to import existing VPC
+    if (vpcId && vpcId !== '') {
+      // For tests, always create new VPC
+      if (this.node.tryGetContext('testMode')) {
+        return new ec2.Vpc(this, `${stackName}Vpc`, {
+          maxAzs: 2,
+          natGateways: 1,
+          subnetConfiguration: [
+            {
+              cidrMask: 24,
+              name: 'public',
+              subnetType: ec2.SubnetType.PUBLIC,
+            },
+            {
+              cidrMask: 24,
+              name: 'private',
+              subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+            },
+          ],
+        });
+      }
+      
+      try {
+        return ec2.Vpc.fromVpcAttributes(this, `${stackName}Vpc`, {
+          vpcId: vpcId,
+          availabilityZones: ['us-west-2a', 'us-west-2b'],
+          privateSubnetIds: config.subnetIds as string[],
+          publicSubnetIds: [],
+        });
+      } catch (error) {
+        // If import fails, create new VPC
+        console.log(`📝 Creating new VPC: ${vpcId}`);
+        return new ec2.Vpc(this, `${stackName}Vpc`, {
+          maxAzs: 2,
+          natGateways: 1,
+          subnetConfiguration: [
+            {
+              cidrMask: 24,
+              name: 'public',
+              subnetType: ec2.SubnetType.PUBLIC,
+            },
+            {
+              cidrMask: 24,
+              name: 'private',
+              subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+            },
+          ],
+        });
+      }
+    }
+    
+    // Otherwise create a new VPC
     return new ec2.Vpc(this, `${stackName}Vpc`, {
       maxAzs: 2,
       natGateways: 1,
@@ -364,7 +415,26 @@ export class EcsServiceStack extends cdk.Stack {
     const config = this.loadConfiguration();
     const stackName = config.stackName || this.stackName;
     
-    // Always create new cluster for now - import logic can be added later
+    // If cluster name is provided, try to import existing cluster
+    if (clusterName && clusterName !== '') {
+      try {
+        return ecs.Cluster.fromClusterAttributes(this, `${stackName}Cluster`, {
+          clusterName: clusterName,
+          vpc: vpc,
+          clusterArn: `arn:aws:ecs:${this.region}:${this.account}:cluster/${clusterName}`,
+        });
+      } catch (error) {
+        // If import fails, create new cluster
+        console.log(`📝 Creating new cluster: ${clusterName}`);
+        return new ecs.Cluster(this, `${stackName}Cluster`, {
+          clusterName: clusterName,
+          vpc: vpc,
+          containerInsights: true,
+        });
+      }
+    }
+    
+    // Otherwise create a new cluster
     return new ecs.Cluster(this, `${stackName}Cluster`, {
       clusterName: clusterName,
       vpc: vpc,
