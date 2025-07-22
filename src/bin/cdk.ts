@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 import * as cdk from 'aws-cdk-lib';
-import { EcsServiceStack } from '../src/ecs-service-stack';
-import { EcsServiceConfig } from '../src/types';
+import { EcsServiceStack } from '../ecs-service-stack';
+import { EcsServiceConfig } from '../types';
 
 /**
  * CDK App Entry Point

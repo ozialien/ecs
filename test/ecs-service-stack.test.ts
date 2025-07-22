@@ -436,7 +436,7 @@ describe('EcsServiceStack', () => {
           // Missing containerPort - using type assertion to test runtime validation
         } as any
       });
-    }).toThrow('Missing required parameter: containerPort');
+    }).toThrow('Missing required parameters: containerPort');
   });
 
   test('package builds successfully', () => {

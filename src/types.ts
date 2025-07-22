@@ -43,10 +43,10 @@ export interface EcsServiceConfig {
   };
   
   /** Port that the container exposes */
-  containerPort: number;
+  containerPort?: number;
   
   /** Load balancer port */
-  lbPort: number;
+  lbPort?: number;
   
   /** Health check path (default: '/') */
   healthCheckPath?: string;

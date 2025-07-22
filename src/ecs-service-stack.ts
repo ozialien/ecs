@@ -13,6 +13,7 @@
  * No hardcoded values or environment logic in the code.
  */
 
+// AWS CDK imports
 import * as cdk from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
@@ -21,9 +22,37 @@ import * as logs from 'aws-cdk-lib/aws-logs';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as servicediscovery from 'aws-cdk-lib/aws-servicediscovery';
 import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
+
+// Standard library imports
+import * as fs from 'fs';
+import * as path from 'path';
+
+// Local imports
 import { Construct } from 'constructs';
 import { EcsServiceConfig, EcsServiceStackProps } from './types';
 import { showHelp } from './help';
+
+/**
+ * Default configuration values
+ */
+const DEFAULT_CONFIG = {
+  DESIRED_COUNT: 1,
+  CPU: 256,
+  MEMORY: 512,
+  HEALTH_CHECK_PATH: '/',
+  ALLOWED_CIDR: '0.0.0.0/0',
+  LOG_RETENTION_DAYS: 7,
+  ENABLE_AUTO_SCALING: false,
+  MIN_CAPACITY: 1,
+  MAX_CAPACITY: 10,
+  TARGET_CPU_UTILIZATION: 70,
+  TARGET_MEMORY_UTILIZATION: 70,
+  HEALTH_CHECK_INTERVAL: 30,
+  HEALTH_CHECK_TIMEOUT: 5,
+  HEALTH_CHECK_START_PERIOD: 60,
+  HEALTH_CHECK_RETRIES: 3,
+  SERVICE_DISCOVERY_TTL: 10,
+} as const;
 
 /**
  * ECS Service Stack construct
@@ -40,46 +69,58 @@ export class EcsServiceStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: EcsServiceStackProps) {
     super(scope, id, props);
     
-    // Store props for access in loadConfiguration
     this.stackProps = props;
 
     // Check for help request first
-    const help = this.node.tryGetContext('help');
-    if (help === 'true' || help === true) {
+    if (this.isHelpRequested()) {
       showHelp();
       return;
     }
 
-    // Load configuration from context parameters
+    // Load and validate configuration
     const config = this.loadConfiguration();
+    this.validateRequiredParameters(config);
 
-    // Runtime validation for required ports
-    if (config.containerPort == null) {
-      throw new Error("Missing required parameter: containerPort. Please provide --context containerPort=<port>.");
-    }
-    if (config.lbPort == null) {
-      throw new Error("Missing required parameter: lbPort. Please provide --context lbPort=<port>.");
-    }
-
-    // Create or import VPC
+    // Create infrastructure
     const vpc = this.createOrImportVpc(config.vpcId);
-
-    // Create or import ECS cluster
     this.cluster = this.createOrImportCluster(config.clusterName, vpc);
-
-    // Create the ECS service with load balancer
     this.loadBalancer = this.createEcsService(config, vpc);
-
-    // Store reference to the service
     this.service = this.loadBalancer.service;
 
-    // Add auto scaling if enabled
+    // Add optional features
     if (config.enableAutoScaling) {
       this.addAutoScaling(config);
     }
 
-    // Output important values
+    // Add outputs
     this.addOutputs(config);
+  }
+
+  /**
+   * Check if help is requested via context parameter
+   */
+  private isHelpRequested(): boolean {
+    const help = this.node.tryGetContext('help');
+    return help === 'true' || help === true;
+  }
+
+  /**
+   * Validate required parameters and throw descriptive errors
+   */
+  private validateRequiredParameters(config: EcsServiceConfig): void {
+    const missingParams: string[] = [];
+
+    if (config.containerPort == null) {
+      missingParams.push('containerPort');
+    }
+    if (config.lbPort == null) {
+      missingParams.push('lbPort');
+    }
+
+    if (missingParams.length > 0) {
+      const paramList = missingParams.map(p => `--context ${p}=<value>`).join(' ');
+      throw new Error(`Missing required parameters: ${missingParams.join(', ')}. Please provide ${paramList}`);
+    }
   }
 
   /**
@@ -87,39 +128,39 @@ export class EcsServiceStack extends cdk.Stack {
    * Follows 12-factor principles - all configuration via environment/context
    */
   private loadConfiguration(): EcsServiceConfig {
-    // Use props.config (for tests), fallback to context (for CLI usage)
     const testConfig = this.stackProps?.config || {};
+    
     const config: EcsServiceConfig = {
       // Required parameters
-      vpcId: testConfig.vpcId ?? this.node.tryGetContext('vpcId') ?? this.requireContext('vpcId'),
-      subnetIds: this.parseSubnetIds(testConfig.subnetIds ?? this.node.tryGetContext('subnetIds') ?? this.requireContext('subnetIds')),
-      clusterName: testConfig.clusterName ?? this.node.tryGetContext('clusterName') ?? this.requireContext('clusterName'),
-      image: testConfig.image ?? this.node.tryGetContext('image') ?? this.requireContext('image'),
+      vpcId: this.getContextValue('vpcId', testConfig.vpcId) ?? this.requireContext('vpcId'),
+      subnetIds: this.parseSubnetIds(this.getContextValue('subnetIds', testConfig.subnetIds)),
+      clusterName: this.getContextValue('clusterName', testConfig.clusterName) ?? this.requireContext('clusterName'),
+      image: this.getContextValue('image', testConfig.image) ?? this.requireContext('image'),
 
       // Optional parameters with defaults
-      serviceName: testConfig.serviceName ?? this.node.tryGetContext('serviceName') ?? this.stackName,
-      desiredCount: testConfig.desiredCount ?? this.node.tryGetContext('desiredCount') ?? 1,
-      cpu: testConfig.cpu ?? this.node.tryGetContext('cpu') ?? 256,
-      memory: testConfig.memory ?? this.node.tryGetContext('memory') ?? 512,
-      containerPort: testConfig.containerPort ?? this.node.tryGetContext('containerPort'),
-      lbPort: testConfig.lbPort ?? this.node.tryGetContext('lbPort'),
-      healthCheckPath: testConfig.healthCheckPath ?? this.node.tryGetContext('healthCheckPath') ?? '/',
-      healthCheck: testConfig.healthCheck ?? this.node.tryGetContext('healthCheck'),
-      resourceLimits: testConfig.resourceLimits ?? this.node.tryGetContext('resourceLimits'),
-      serviceDiscovery: testConfig.serviceDiscovery ?? this.node.tryGetContext('serviceDiscovery'),
-      capacityProvider: testConfig.capacityProvider ?? this.node.tryGetContext('capacityProvider'),
-      gracefulShutdown: testConfig.gracefulShutdown ?? this.node.tryGetContext('gracefulShutdown'),
-      placementStrategies: testConfig.placementStrategies ?? this.node.tryGetContext('placementStrategies'),
-      allowedCidr: testConfig.allowedCidr ?? this.node.tryGetContext('allowedCidr') ?? '0.0.0.0/0',
-      logRetentionDays: testConfig.logRetentionDays ?? this.node.tryGetContext('logRetentionDays') ?? 7,
-      enableAutoScaling: testConfig.enableAutoScaling ?? this.node.tryGetContext('enableAutoScaling') ?? false,
-      minCapacity: testConfig.minCapacity ?? this.node.tryGetContext('minCapacity') ?? 1,
-      maxCapacity: testConfig.maxCapacity ?? this.node.tryGetContext('maxCapacity') ?? 10,
-      targetCpuUtilization: testConfig.targetCpuUtilization ?? this.node.tryGetContext('targetCpuUtilization') ?? 70,
-      targetMemoryUtilization: testConfig.targetMemoryUtilization ?? this.node.tryGetContext('targetMemoryUtilization') ?? 70,
-      taskExecutionRoleArn: testConfig.taskExecutionRoleArn ?? this.node.tryGetContext('taskExecutionRoleArn'),
-      taskRoleArn: testConfig.taskRoleArn ?? this.node.tryGetContext('taskRoleArn'),
-      valuesFile: testConfig.valuesFile ?? this.node.tryGetContext('valuesFile'),
+      serviceName: this.getContextValue('serviceName', testConfig.serviceName) ?? this.stackName,
+      desiredCount: this.getNumericContextValue('desiredCount', testConfig.desiredCount) ?? DEFAULT_CONFIG.DESIRED_COUNT,
+      cpu: this.getNumericContextValue('cpu', testConfig.cpu) ?? DEFAULT_CONFIG.CPU,
+      memory: this.getNumericContextValue('memory', testConfig.memory) ?? DEFAULT_CONFIG.MEMORY,
+      containerPort: this.getNumericContextValue('containerPort', testConfig.containerPort),
+      lbPort: this.getNumericContextValue('lbPort', testConfig.lbPort),
+      healthCheckPath: this.getContextValue('healthCheckPath', testConfig.healthCheckPath) ?? DEFAULT_CONFIG.HEALTH_CHECK_PATH,
+      healthCheck: this.getContextValue('healthCheck', testConfig.healthCheck),
+      resourceLimits: this.getContextValue('resourceLimits', testConfig.resourceLimits),
+      serviceDiscovery: this.getContextValue('serviceDiscovery', testConfig.serviceDiscovery),
+      capacityProvider: this.getContextValue('capacityProvider', testConfig.capacityProvider),
+      gracefulShutdown: this.getContextValue('gracefulShutdown', testConfig.gracefulShutdown),
+      placementStrategies: this.getContextValue('placementStrategies', testConfig.placementStrategies),
+      allowedCidr: this.getContextValue('allowedCidr', testConfig.allowedCidr) ?? DEFAULT_CONFIG.ALLOWED_CIDR,
+      logRetentionDays: this.getNumericContextValue('logRetentionDays', testConfig.logRetentionDays) ?? DEFAULT_CONFIG.LOG_RETENTION_DAYS,
+      enableAutoScaling: this.getBooleanContextValue('enableAutoScaling', testConfig.enableAutoScaling) ?? DEFAULT_CONFIG.ENABLE_AUTO_SCALING,
+      minCapacity: this.getNumericContextValue('minCapacity', testConfig.minCapacity) ?? DEFAULT_CONFIG.MIN_CAPACITY,
+      maxCapacity: this.getNumericContextValue('maxCapacity', testConfig.maxCapacity) ?? DEFAULT_CONFIG.MAX_CAPACITY,
+      targetCpuUtilization: this.getNumericContextValue('targetCpuUtilization', testConfig.targetCpuUtilization) ?? DEFAULT_CONFIG.TARGET_CPU_UTILIZATION,
+      targetMemoryUtilization: this.getNumericContextValue('targetMemoryUtilization', testConfig.targetMemoryUtilization) ?? DEFAULT_CONFIG.TARGET_MEMORY_UTILIZATION,
+      taskExecutionRoleArn: this.getContextValue('taskExecutionRoleArn', testConfig.taskExecutionRoleArn),
+      taskRoleArn: this.getContextValue('taskRoleArn', testConfig.taskRoleArn),
+      valuesFile: this.getContextValue('valuesFile', testConfig.valuesFile),
     };
 
     // Load from values file if specified
@@ -129,97 +170,129 @@ export class EcsServiceStack extends cdk.Stack {
     }
 
     // Parse environment variables and secrets
-    config.environment = testConfig.environment ?? this.parseEnvironmentVariables();
-    config.secrets = testConfig.secrets ?? this.parseSecrets();
+    config.environment = this.parseEnvironmentVariables();
+    config.secrets = this.parseSecrets();
 
     return config;
   }
 
   /**
-   * Parse subnet IDs from context parameter
-   * Supports both comma-separated string and array
+   * Get context value with fallback to test config
    */
-  private parseSubnetIds(subnetIds: string | string[]): string[] {
+  private getContextValue<T>(key: string, testValue?: T): T | undefined {
+    return testValue ?? this.node.tryGetContext(key);
+  }
+
+  /**
+   * Get numeric context value with proper type conversion
+   */
+  private getNumericContextValue(key: string, testValue?: number): number | undefined {
+    const value = this.getContextValue(key, testValue);
+    if (value === undefined) return undefined;
+    return typeof value === 'string' ? parseInt(value, 10) : value;
+  }
+
+  /**
+   * Get boolean context value with proper type conversion
+   */
+  private getBooleanContextValue(key: string, testValue?: boolean): boolean | undefined {
+    const value = this.getContextValue(key, testValue);
+    if (value === undefined) return undefined;
+    if (typeof value === 'string') {
+      return (value as string).toLowerCase() === 'true';
+    }
+    return Boolean(value);
+  }
+
+  /**
+   * Parse subnet IDs from string or array
+   */
+  private parseSubnetIds(subnetIds: string | string[] | undefined): string[] {
+    if (!subnetIds) {
+      throw new Error('Required context parameter subnetIds is missing');
+    }
+    
     if (Array.isArray(subnetIds)) {
       return subnetIds;
     }
+    
     return subnetIds.split(',').map(id => id.trim());
   }
 
   /**
-   * Parse environment variables from context parameters
-   * Format: env:KEY=value,env:ANOTHER_KEY=another_value
+   * Parse environment variables from context
    */
   private parseEnvironmentVariables(): { [key: string]: string } {
-    const envVars: { [key: string]: string } = {};
+    const env: { [key: string]: string } = {};
+    
     try {
-      const context = this.node.getContext('env');
-      
-      if (context && typeof context === 'object') {
-        Object.entries(context).forEach(([key, value]) => {
-          if (typeof value === 'string') {
-            envVars[key] = value;
-          }
-        });
+      const envContext = this.node.getContext('env');
+      if (envContext && typeof envContext === 'object') {
+        Object.assign(env, envContext);
       }
     } catch (error) {
-      // Context parameter not set, return empty object
+      // Environment variables are optional, so we ignore errors
     }
-
-    return envVars;
+    
+    return env;
   }
 
   /**
-   * Parse secrets from context parameters
-   * Format: secret:KEY=arn:aws:secretsmanager:region:account:secret:name
+   * Parse secrets from context
    */
   private parseSecrets(): { [key: string]: string } {
     const secrets: { [key: string]: string } = {};
+    
     try {
-      const context = this.node.getContext('secret');
-      
-      if (context && typeof context === 'object') {
-        Object.entries(context).forEach(([key, value]) => {
-          if (typeof value === 'string') {
-            secrets[key] = value;
-          }
-        });
+      const secretContext = this.node.getContext('secret');
+      if (secretContext && typeof secretContext === 'object') {
+        Object.assign(secrets, secretContext);
       }
     } catch (error) {
-      // Context parameter not set, return empty object
+      // Secrets are optional, so we ignore errors
     }
-
+    
     return secrets;
   }
 
   /**
-   * Load values from file (JSON, JS, or YAML)
-   * Graceful fallback to JSON if YAML parser not available
+   * Load configuration from values file (JSON, YAML, JS)
    */
-  private loadValuesFile(filePath: string): any {
-    const fs = require('fs');
-    const path = require('path');
-    
+  private loadValuesFile(filePath: string): Record<string, any> {
     if (!fs.existsSync(filePath)) {
       console.warn(`⚠️  Warning: Values file not found: ${filePath}, skipping`);
       return {};
     }
 
-    const fileContent = fs.readFileSync(filePath, 'utf8');
-    const ext = path.extname(filePath).toLowerCase();
+    try {
+      const fileContent = fs.readFileSync(filePath, 'utf8');
+      const ext = path.extname(filePath).toLowerCase();
 
-    if (ext === '.js') {
-      return require(path.resolve(filePath));
-    } else if (ext === '.yaml' || ext === '.yml') {
-      try {
-        const yaml = require('js-yaml');
-        return yaml.load(fileContent);
-      } catch (yamlError) {
-        console.warn(`⚠️  Warning: js-yaml not available, falling back to JSON`);
-        return JSON.parse(fileContent);
+      switch (ext) {
+        case '.js':
+          return require(path.resolve(filePath));
+        case '.yaml':
+        case '.yml':
+          return this.parseYaml(fileContent);
+        default:
+          return JSON.parse(fileContent);
       }
-    } else {
-      return JSON.parse(fileContent);
+    } catch (error) {
+      console.warn(`⚠️  Warning: Failed to parse values file ${filePath}: ${error}`);
+      return {};
+    }
+  }
+
+  /**
+   * Parse YAML content with fallback to JSON
+   */
+  private parseYaml(content: string): any {
+    try {
+      const yaml = require('js-yaml');
+      return yaml.load(content);
+    } catch (yamlError) {
+      console.warn(`⚠️  Warning: js-yaml not available, falling back to JSON`);
+      return JSON.parse(content);
     }
   }
 
@@ -246,28 +319,67 @@ export class EcsServiceStack extends cdk.Stack {
    * Create ECS service with application load balancer
    */
   private createEcsService(config: EcsServiceConfig, vpc: ec2.IVpc): ecs_patterns.ApplicationLoadBalancedFargateService {
-    // Create log group
-    const logGroup = new logs.LogGroup(this, `${config.serviceName}LogGroup`, {
+    const logGroup = this.createLogGroup(config);
+    const taskDefinition = this.createTaskDefinition(config);
+    const container = this.addContainerToTaskDefinition(config, taskDefinition, logGroup);
+    
+    const service = this.createLoadBalancedService(config, taskDefinition);
+    
+    this.configureServiceDiscovery(config, vpc);
+    this.configureSecurityGroup(service, config);
+    
+    return service;
+  }
+
+  /**
+   * Create CloudWatch log group for the service
+   */
+  private createLogGroup(config: EcsServiceConfig): logs.LogGroup {
+    return new logs.LogGroup(this, `${config.serviceName}LogGroup`, {
       logGroupName: config.logGroupName || `/ecs/${config.serviceName}`,
       retention: logs.RetentionDays.ONE_WEEK,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
+  }
 
-    // Create task definition
-    const taskDefinition = new ecs.FargateTaskDefinition(this, `${config.serviceName}TaskDef`, {
+  /**
+   * Create Fargate task definition
+   */
+  private createTaskDefinition(config: EcsServiceConfig): ecs.FargateTaskDefinition {
+    return new ecs.FargateTaskDefinition(this, `${config.serviceName}TaskDef`, {
       cpu: config.cpu,
       memoryLimitMiB: config.memory,
-      executionRole: config.taskExecutionRoleArn ? 
-        iam.Role.fromRoleArn(this, `${config.serviceName}ExecutionRole`, config.taskExecutionRoleArn) : 
-        undefined,
-      taskRole: config.taskRoleArn ? 
-        iam.Role.fromRoleArn(this, `${config.serviceName}TaskRole`, config.taskRoleArn) : 
-        undefined,
-      // Note: Graceful shutdown is configured at the service level
-      // and is handled automatically by ECS
+      executionRole: this.createExecutionRole(config),
+      taskRole: this.createTaskRole(config),
     });
+  }
 
-    // Add container to task definition
+  /**
+   * Create execution role if ARN provided
+   */
+  private createExecutionRole(config: EcsServiceConfig): iam.IRole | undefined {
+    return config.taskExecutionRoleArn ? 
+      iam.Role.fromRoleArn(this, `${config.serviceName}ExecutionRole`, config.taskExecutionRoleArn) : 
+      undefined;
+  }
+
+  /**
+   * Create task role if ARN provided
+   */
+  private createTaskRole(config: EcsServiceConfig): iam.IRole | undefined {
+    return config.taskRoleArn ? 
+      iam.Role.fromRoleArn(this, `${config.serviceName}TaskRole`, config.taskRoleArn) : 
+      undefined;
+  }
+
+  /**
+   * Add container to task definition
+   */
+  private addContainerToTaskDefinition(
+    config: EcsServiceConfig, 
+    taskDefinition: ecs.FargateTaskDefinition, 
+    logGroup: logs.LogGroup
+  ): ecs.ContainerDefinition {
     const container = taskDefinition.addContainer(`${config.serviceName}Container`, {
       image: this.createContainerImage(config.image),
       logging: ecs.LogDrivers.awsLogs({
@@ -276,71 +388,102 @@ export class EcsServiceStack extends cdk.Stack {
       }),
       environment: config.environment,
       secrets: config.secrets ? this.createSecrets(config.secrets) : undefined,
-                  healthCheck: config.healthCheck?.command ? {
-              command: config.healthCheck.command,
-              interval: config.healthCheck.interval || cdk.Duration.seconds(30),
-              timeout: config.healthCheck.timeout || cdk.Duration.seconds(5),
-              startPeriod: config.healthCheck.startPeriod || cdk.Duration.seconds(60),
-              retries: config.healthCheck.retries || 3,
-            } : undefined,
+      healthCheck: this.createHealthCheck(config.healthCheck),
       cpu: config.resourceLimits?.cpu,
       memoryLimitMiB: config.resourceLimits?.memory,
     });
 
-    // Add port mapping
     container.addPortMappings({
       containerPort: config.containerPort!,
       protocol: ecs.Protocol.TCP,
     });
 
-    // Create the service
-    const service = new ecs_patterns.ApplicationLoadBalancedFargateService(this, `${config.serviceName}Service`, {
+    return container;
+  }
+
+  /**
+   * Create health check configuration
+   */
+  private createHealthCheck(healthCheck?: EcsServiceConfig['healthCheck']): ecs.HealthCheck | undefined {
+    if (!healthCheck?.command) return undefined;
+
+    return {
+      command: healthCheck.command,
+      interval: healthCheck.interval || cdk.Duration.seconds(DEFAULT_CONFIG.HEALTH_CHECK_INTERVAL),
+      timeout: healthCheck.timeout || cdk.Duration.seconds(DEFAULT_CONFIG.HEALTH_CHECK_TIMEOUT),
+      startPeriod: healthCheck.startPeriod || cdk.Duration.seconds(DEFAULT_CONFIG.HEALTH_CHECK_START_PERIOD),
+      retries: healthCheck.retries || DEFAULT_CONFIG.HEALTH_CHECK_RETRIES,
+    };
+  }
+
+  /**
+   * Create load balanced service
+   */
+  private createLoadBalancedService(
+    config: EcsServiceConfig, 
+    taskDefinition: ecs.FargateTaskDefinition
+  ): ecs_patterns.ApplicationLoadBalancedFargateService {
+    return new ecs_patterns.ApplicationLoadBalancedFargateService(this, `${config.serviceName}Service`, {
       cluster: this.cluster,
       taskDefinition: taskDefinition,
       desiredCount: config.desiredCount,
       publicLoadBalancer: true,
       listenerPort: config.lbPort!,
       serviceName: config.serviceName,
-      capacityProviderStrategies: config.capacityProvider ? [
-        {
-          capacityProvider: config.capacityProvider,
-          weight: 1,
-        }
-      ] : undefined,
+      capacityProviderStrategies: this.createCapacityProviderStrategies(config.capacityProvider),
+    });
+  }
+
+  /**
+   * Create capacity provider strategies
+   */
+  private createCapacityProviderStrategies(capacityProvider?: string) {
+    return capacityProvider ? [
+      {
+        capacityProvider: capacityProvider,
+        weight: 1,
+      }
+    ] : undefined;
+  }
+
+  /**
+   * Configure service discovery if enabled
+   */
+  private configureServiceDiscovery(config: EcsServiceConfig, vpc: ec2.IVpc): void {
+    if (!config.serviceDiscovery) return;
+
+    const namespace = new servicediscovery.PrivateDnsNamespace(this, `${config.serviceName}Namespace`, {
+      name: config.serviceDiscovery.namespace || `${config.serviceName}.local`,
+      vpc: vpc,
     });
 
-    // Note: Placement strategies are configured via AWS CLI or console
-    // as they require advanced ECS service configuration
-    // Example: aws ecs update-service --cluster my-cluster --service my-service --placement-strategy type=spread,field=attribute:ecs.availability-zone
+    new servicediscovery.Service(this, `${config.serviceName}ServiceDiscovery`, {
+      namespace: namespace,
+      name: config.serviceDiscovery.serviceName || config.serviceName,
+      dnsRecordType: config.serviceDiscovery.dnsType === 'SRV' ? 
+        servicediscovery.DnsRecordType.SRV : 
+        servicediscovery.DnsRecordType.A,
+      dnsTtl: cdk.Duration.seconds(config.serviceDiscovery.ttl || DEFAULT_CONFIG.SERVICE_DISCOVERY_TTL),
+    });
 
-    // Add service discovery if configured
-    if (config.serviceDiscovery) {
-      const namespace = new servicediscovery.PrivateDnsNamespace(this, `${config.serviceName}Namespace`, {
-        name: config.serviceDiscovery.namespace || `${config.serviceName}.local`,
-        vpc: vpc,
-      });
+    // Note: Service discovery integration requires manual configuration
+    // The service discovery service is created but not automatically associated
+    // Users can manually associate it via AWS CLI or console
+  }
 
-      const serviceDiscoveryService = new servicediscovery.Service(this, `${config.serviceName}ServiceDiscovery`, {
-        namespace: namespace,
-        name: config.serviceDiscovery.serviceName || config.serviceName,
-        dnsRecordType: config.serviceDiscovery.dnsType === 'SRV' ? servicediscovery.DnsRecordType.SRV : servicediscovery.DnsRecordType.A,
-        dnsTtl: cdk.Duration.seconds(config.serviceDiscovery.ttl || 10),
-      });
+  /**
+   * Configure security group rules
+   */
+  private configureSecurityGroup(
+    service: ecs_patterns.ApplicationLoadBalancedFargateService, 
+    config: EcsServiceConfig
+  ): void {
+    if (config.allowedCidr === DEFAULT_CONFIG.ALLOWED_CIDR) return;
 
-      // Note: Service discovery integration requires manual configuration
-      // The service discovery service is created but not automatically associated
-      // Users can manually associate it via AWS CLI or console
-    }
-
-    // Configure security group
-    if (config.allowedCidr !== '0.0.0.0/0') {
-      service.loadBalancer.connections.allowFromAnyIpv4(
-        ec2.Port.tcp(config.lbPort!),
-        `Allow HTTP from ${config.allowedCidr}`
-      );
-    }
-
-    return service;
+    service.loadBalancer.connections.allowFromAnyIpv4(
+      ec2.Port.tcp(config.lbPort!),
+      `Allow HTTP from ${config.allowedCidr}`
+    );
   }
 
   /**
