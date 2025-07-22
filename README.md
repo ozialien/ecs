@@ -178,6 +178,7 @@ cdk deploy --context help=true
 
 ## Features
 
+### Core Features
 - **Helm-style configuration**: All configuration via context parameters
 - **12-factor compliant**: No hardcoded values or environment logic in code
 - **Multiple image sources**: Support for ECR, external registries, and local Containerfiles
@@ -189,10 +190,79 @@ cdk deploy --context help=true
 - **Security groups**: Configurable network security
 - **Load balancer**: Application Load Balancer integration
 
+### Advanced Features
+
+#### Container Health Checks
+Configure container-level health checks for production reliability:
+
+```bash
+# Basic health check
+AWS_PROFILE=dev cdk deploy \
+  --context vpcId=vpc-12345678 \
+  --context image=nginx:alpine \
+  --context healthCheck='{"command":["CMD-SHELL","curl -f http://localhost:80/ || exit 1"],"interval":30,"timeout":5,"startPeriod":60,"retries":3}'
+```
+
+#### Resource Limits
+Set container-level CPU and memory limits:
+
+```bash
+# Container resource limits
+AWS_PROFILE=dev cdk deploy \
+  --context vpcId=vpc-12345678 \
+  --context image=nginx:alpine \
+  --context resourceLimits='{"cpu":256,"memory":512}'
+```
+
+#### Service Discovery
+Enable AWS Cloud Map service discovery for microservices:
+
+```bash
+# Service discovery configuration
+AWS_PROFILE=dev cdk deploy \
+  --context vpcId=vpc-12345678 \
+  --context image=nginx:alpine \
+  --context serviceDiscovery='{"namespace":"myapp.local","serviceName":"api","dnsType":"A","ttl":10}'
+```
+
+#### Capacity Providers
+Optimize costs with FARGATE_SPOT capacity provider:
+
+```bash
+# Use spot instances for cost optimization
+AWS_PROFILE=dev cdk deploy \
+  --context vpcId=vpc-12345678 \
+  --context image=nginx:alpine \
+  --context capacityProvider=FARGATE_SPOT
+```
+
+#### Task Placement Strategies
+Configure task placement for high availability and cost optimization:
+
+```bash
+# Manual configuration via AWS CLI after deployment
+aws ecs update-service --cluster my-cluster --service my-service \
+  --placement-strategy type=spread,field=attribute:ecs.availability-zone
+
+# Or use binpack for resource optimization
+aws ecs update-service --cluster my-cluster --service my-service \
+  --placement-strategy type=binpack,field=attribute:ecs.cpu
+```
+
+#### Graceful Shutdown
+ECS handles graceful shutdown automatically, but you can configure it via AWS CLI:
+
+```bash
+# Configure graceful shutdown
+aws ecs update-service --cluster my-cluster --service my-service \
+  --deployment-configuration maximumPercent=200,minimumHealthyPercent=100
+```
+
 ## Architecture
 
 The package creates the following AWS resources:
 
+### Core Resources
 - **ECS Cluster**: Imported or created cluster
 - **Task Definition**: Fargate task definition with container
 - **ECS Service**: Fargate service with load balancer
@@ -202,6 +272,13 @@ The package creates the following AWS resources:
 - **CloudWatch Log Group**: Logging for the ECS service
 - **Auto Scaling**: Optional auto scaling based on CPU/memory
 - **IAM Roles**: Task execution and task roles (optional)
+
+### Advanced Resources (Optional)
+- **Service Discovery**: AWS Cloud Map namespace and service (if configured)
+- **Container Health Checks**: Container-level health monitoring
+- **Resource Limits**: Container-level CPU and memory constraints
+- **Capacity Providers**: FARGATE or FARGATE_SPOT capacity optimization
+- **Placement Strategies**: Task placement configuration (manual)
 
 ## Outputs
 
