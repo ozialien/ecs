@@ -33,7 +33,9 @@ describe('EcsServiceStack', () => {
         vpcId: 'vpc-12345678',
         subnetIds: ['subnet-12345678', 'subnet-87654321'],
         clusterName: 'test-cluster',
-        image: 'nginx:alpine'
+        image: 'nginx:alpine',
+        containerPort: 80,
+        lbPort: 80
       }
     });
 
@@ -129,6 +131,8 @@ describe('EcsServiceStack', () => {
         subnetIds: ['subnet-12345678', 'subnet-87654321'],
         clusterName: 'test-cluster',
         image: 'nginx:alpine',
+        containerPort: 80,
+        lbPort: 80,
         enableAutoScaling: true,
         minCapacity: 2,
         maxCapacity: 5,
@@ -174,6 +178,8 @@ describe('EcsServiceStack', () => {
         subnetIds: ['subnet-12345678', 'subnet-87654321'],
         clusterName: 'test-cluster',
         image: 'nginx:alpine',
+        containerPort: 80,
+        lbPort: 80,
         environment: {
           NODE_ENV: 'production',
           API_VERSION: 'v1',
@@ -220,6 +226,8 @@ describe('EcsServiceStack', () => {
         subnetIds: ['subnet-12345678', 'subnet-87654321'],
         clusterName: 'test-cluster',
         image: 'nginx:alpine',
+        containerPort: 80,
+        lbPort: 80,
         secrets: {
           DB_PASSWORD: 'arn:aws:secretsmanager:us-west-2:123456789012:secret:db-password-abc123',
           API_KEY: 'arn:aws:secretsmanager:us-west-2:123456789012:secret:api-key-def456'
@@ -263,6 +271,8 @@ describe('EcsServiceStack', () => {
         subnetIds: ['subnet-12345678', 'subnet-87654321'],
         clusterName: 'test-cluster',
         image: 'nginx:alpine',
+        containerPort: 80,
+        lbPort: 80,
         taskExecutionRoleArn: 'arn:aws:iam::123456789012:role/ecsTaskExecutionRole',
         taskRoleArn: 'arn:aws:iam::123456789012:role/ecsTaskRole'
       }
@@ -297,6 +307,8 @@ describe('EcsServiceStack', () => {
         subnetIds: ['subnet-12345678', 'subnet-87654321'],
         clusterName: 'test-cluster',
         image: 'nginx:alpine',
+        containerPort: 80,
+        lbPort: 80,
         allowedCidr: '10.0.0.0/16'
       }
     });
@@ -329,7 +341,9 @@ describe('EcsServiceStack', () => {
         vpcId: 'vpc-12345678',
         subnetIds: ['subnet-12345678', 'subnet-87654321'],
         clusterName: 'test-cluster',
-        image: './test/docker'
+        image: './test/docker',
+        containerPort: 80,
+        lbPort: 80
       }
     });
 
@@ -361,6 +375,8 @@ describe('EcsServiceStack', () => {
         subnetIds: ['subnet-12345678', 'subnet-87654321'],
         clusterName: 'test-cluster',
         image: 'nginx:alpine',
+        containerPort: 80,
+        lbPort: 80,
         valuesFile: 'test-values.json'
       }
     });
@@ -391,7 +407,9 @@ describe('EcsServiceStack', () => {
         vpcId: 'vpc-12345678',
         subnetIds: ['subnet-12345678', 'subnet-87654321'],
         clusterName: 'test-cluster',
-        image: 'nginx:alpine'
+        image: 'nginx:alpine',
+        containerPort: 80,
+        lbPort: 80
       }
     });
 
@@ -401,19 +419,24 @@ describe('EcsServiceStack', () => {
     consoleSpy.mockRestore();
   });
 
-  test('throws error when required context parameters are missing', () => {
-    // Don't set any context parameters
-
+  test('throws error when required parameters are missing', () => {
+    // Test missing containerPort
     expect(() => {
-      new EcsServiceStack(app, 'MissingParamsEcsService', {
+      new EcsServiceStack(app, 'MissingContainerPortEcsService', {
+        env: {
+          account: '123456789012',
+          region: 'us-west-2'
+        },
         config: {
           vpcId: 'vpc-12345678',
           subnetIds: ['subnet-12345678', 'subnet-87654321'],
           clusterName: 'test-cluster',
-          image: 'nginx:alpine'
-        }
+          image: 'nginx:alpine',
+          lbPort: 80
+          // Missing containerPort - using type assertion to test runtime validation
+        } as any
       });
-    }).toThrow('Required context parameter');
+    }).toThrow('Missing required parameter: containerPort');
   });
 
   test('package builds successfully', () => {

@@ -35,9 +35,13 @@ export class EcsServiceStack extends cdk.Stack {
   public readonly service: ecs.FargateService;
   public readonly cluster: ecs.ICluster;
   public readonly loadBalancer: ecs_patterns.ApplicationLoadBalancedFargateService;
+  private readonly stackProps: EcsServiceStackProps;
 
   constructor(scope: Construct, id: string, props: EcsServiceStackProps) {
     super(scope, id, props);
+    
+    // Store props for access in loadConfiguration
+    this.stackProps = props;
 
     // Check for help request first
     const help = this.node.tryGetContext('help');
@@ -48,6 +52,14 @@ export class EcsServiceStack extends cdk.Stack {
 
     // Load configuration from context parameters
     const config = this.loadConfiguration();
+
+    // Runtime validation for required ports
+    if (config.containerPort == null) {
+      throw new Error("Missing required parameter: containerPort. Please provide --context containerPort=<port>.");
+    }
+    if (config.lbPort == null) {
+      throw new Error("Missing required parameter: lbPort. Please provide --context lbPort=<port>.");
+    }
 
     // Create or import VPC
     const vpc = this.createOrImportVpc(config.vpcId);
@@ -75,37 +87,39 @@ export class EcsServiceStack extends cdk.Stack {
    * Follows 12-factor principles - all configuration via environment/context
    */
   private loadConfiguration(): EcsServiceConfig {
+    // Use props.config (for tests), fallback to context (for CLI usage)
+    const testConfig = this.stackProps?.config || {};
     const config: EcsServiceConfig = {
       // Required parameters
-      vpcId: this.node.tryGetContext('vpcId') || this.requireContext('vpcId'),
-      subnetIds: this.parseSubnetIds(this.node.tryGetContext('subnetIds') || this.requireContext('subnetIds')),
-      clusterName: this.node.tryGetContext('clusterName') || this.requireContext('clusterName'),
-      image: this.node.tryGetContext('image') || this.requireContext('image'),
+      vpcId: testConfig.vpcId ?? this.node.tryGetContext('vpcId') ?? this.requireContext('vpcId'),
+      subnetIds: this.parseSubnetIds(testConfig.subnetIds ?? this.node.tryGetContext('subnetIds') ?? this.requireContext('subnetIds')),
+      clusterName: testConfig.clusterName ?? this.node.tryGetContext('clusterName') ?? this.requireContext('clusterName'),
+      image: testConfig.image ?? this.node.tryGetContext('image') ?? this.requireContext('image'),
 
       // Optional parameters with defaults
-      serviceName: this.node.tryGetContext('serviceName') || this.stackName,
-      desiredCount: this.node.tryGetContext('desiredCount') || 1,
-      cpu: this.node.tryGetContext('cpu') || 256,
-      memory: this.node.tryGetContext('memory') || 512,
-      containerPort: this.node.tryGetContext('containerPort') || 80,
-      lbPort: this.node.tryGetContext('lbPort') || 80,
-      healthCheckPath: this.node.tryGetContext('healthCheckPath') || '/',
-      healthCheck: this.node.tryGetContext('healthCheck'),
-      resourceLimits: this.node.tryGetContext('resourceLimits'),
-      serviceDiscovery: this.node.tryGetContext('serviceDiscovery'),
-      capacityProvider: this.node.tryGetContext('capacityProvider'),
-      gracefulShutdown: this.node.tryGetContext('gracefulShutdown'),
-      placementStrategies: this.node.tryGetContext('placementStrategies'),
-      allowedCidr: this.node.tryGetContext('allowedCidr') || '0.0.0.0/0',
-      logRetentionDays: this.node.tryGetContext('logRetentionDays') || 7,
-      enableAutoScaling: this.node.tryGetContext('enableAutoScaling') || false,
-      minCapacity: this.node.tryGetContext('minCapacity') || 1,
-      maxCapacity: this.node.tryGetContext('maxCapacity') || 10,
-      targetCpuUtilization: this.node.tryGetContext('targetCpuUtilization') || 70,
-      targetMemoryUtilization: this.node.tryGetContext('targetMemoryUtilization') || 70,
-      taskExecutionRoleArn: this.node.tryGetContext('taskExecutionRoleArn'),
-      taskRoleArn: this.node.tryGetContext('taskRoleArn'),
-      valuesFile: this.node.tryGetContext('valuesFile'),
+      serviceName: testConfig.serviceName ?? this.node.tryGetContext('serviceName') ?? this.stackName,
+      desiredCount: testConfig.desiredCount ?? this.node.tryGetContext('desiredCount') ?? 1,
+      cpu: testConfig.cpu ?? this.node.tryGetContext('cpu') ?? 256,
+      memory: testConfig.memory ?? this.node.tryGetContext('memory') ?? 512,
+      containerPort: testConfig.containerPort ?? this.node.tryGetContext('containerPort'),
+      lbPort: testConfig.lbPort ?? this.node.tryGetContext('lbPort'),
+      healthCheckPath: testConfig.healthCheckPath ?? this.node.tryGetContext('healthCheckPath') ?? '/',
+      healthCheck: testConfig.healthCheck ?? this.node.tryGetContext('healthCheck'),
+      resourceLimits: testConfig.resourceLimits ?? this.node.tryGetContext('resourceLimits'),
+      serviceDiscovery: testConfig.serviceDiscovery ?? this.node.tryGetContext('serviceDiscovery'),
+      capacityProvider: testConfig.capacityProvider ?? this.node.tryGetContext('capacityProvider'),
+      gracefulShutdown: testConfig.gracefulShutdown ?? this.node.tryGetContext('gracefulShutdown'),
+      placementStrategies: testConfig.placementStrategies ?? this.node.tryGetContext('placementStrategies'),
+      allowedCidr: testConfig.allowedCidr ?? this.node.tryGetContext('allowedCidr') ?? '0.0.0.0/0',
+      logRetentionDays: testConfig.logRetentionDays ?? this.node.tryGetContext('logRetentionDays') ?? 7,
+      enableAutoScaling: testConfig.enableAutoScaling ?? this.node.tryGetContext('enableAutoScaling') ?? false,
+      minCapacity: testConfig.minCapacity ?? this.node.tryGetContext('minCapacity') ?? 1,
+      maxCapacity: testConfig.maxCapacity ?? this.node.tryGetContext('maxCapacity') ?? 10,
+      targetCpuUtilization: testConfig.targetCpuUtilization ?? this.node.tryGetContext('targetCpuUtilization') ?? 70,
+      targetMemoryUtilization: testConfig.targetMemoryUtilization ?? this.node.tryGetContext('targetMemoryUtilization') ?? 70,
+      taskExecutionRoleArn: testConfig.taskExecutionRoleArn ?? this.node.tryGetContext('taskExecutionRoleArn'),
+      taskRoleArn: testConfig.taskRoleArn ?? this.node.tryGetContext('taskRoleArn'),
+      valuesFile: testConfig.valuesFile ?? this.node.tryGetContext('valuesFile'),
     };
 
     // Load from values file if specified
@@ -115,8 +129,8 @@ export class EcsServiceStack extends cdk.Stack {
     }
 
     // Parse environment variables and secrets
-    config.environment = this.parseEnvironmentVariables();
-    config.secrets = this.parseSecrets();
+    config.environment = testConfig.environment ?? this.parseEnvironmentVariables();
+    config.secrets = testConfig.secrets ?? this.parseSecrets();
 
     return config;
   }
@@ -262,13 +276,13 @@ export class EcsServiceStack extends cdk.Stack {
       }),
       environment: config.environment,
       secrets: config.secrets ? this.createSecrets(config.secrets) : undefined,
-      healthCheck: config.healthCheck ? {
-        command: config.healthCheck.command || ['CMD-SHELL', 'curl -f http://localhost:80/ || exit 1'],
-        interval: config.healthCheck.interval || cdk.Duration.seconds(30),
-        timeout: config.healthCheck.timeout || cdk.Duration.seconds(5),
-        startPeriod: config.healthCheck.startPeriod || cdk.Duration.seconds(60),
-        retries: config.healthCheck.retries || 3,
-      } : undefined,
+                  healthCheck: config.healthCheck?.command ? {
+              command: config.healthCheck.command,
+              interval: config.healthCheck.interval || cdk.Duration.seconds(30),
+              timeout: config.healthCheck.timeout || cdk.Duration.seconds(5),
+              startPeriod: config.healthCheck.startPeriod || cdk.Duration.seconds(60),
+              retries: config.healthCheck.retries || 3,
+            } : undefined,
       cpu: config.resourceLimits?.cpu,
       memoryLimitMiB: config.resourceLimits?.memory,
     });

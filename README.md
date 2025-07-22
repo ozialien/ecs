@@ -41,7 +41,9 @@ AWS_PROFILE=dev cdk deploy \
   --context vpcId=vpc-12345678 \
   --context subnetIds=subnet-12345678,subnet-87654321 \
   --context clusterName=my-cluster \
-  --context image=nginx:alpine
+  --context image=nginx:alpine \
+  --context containerPort=80 \
+  --context lbPort=80
 ```
 
 ### Advanced Configuration
@@ -56,6 +58,8 @@ AWS_PROFILE=prod cdk deploy \
   --context desiredCount=3 \
   --context cpu=512 \
   --context memory=1024 \
+  --context containerPort=8080 \
+  --context lbPort=80 \
   --context enableAutoScaling=true \
   --context minCapacity=2 \
   --context maxCapacity=10
@@ -72,6 +76,8 @@ subnetIds:
   - subnet-87654321
 clusterName: my-cluster
 image: nginx:alpine
+containerPort: 80
+lbPort: 80
 serviceName: myapp-api
 desiredCount: 2
 cpu: 512
@@ -109,7 +115,9 @@ AWS_PROFILE=dev cdk deploy \
   --context vpcId=vpc-12345678 \
   --context subnetIds=subnet-12345678,subnet-87654321 \
   --context clusterName=my-cluster \
-  --context image=./Containerfile
+  --context image=./Containerfile \
+  --context containerPort=80 \
+  --context lbPort=80
 ```
 
 ## Configuration
@@ -122,6 +130,8 @@ AWS_PROFILE=dev cdk deploy \
 | `subnetIds` | Subnet IDs (comma-separated or array) | `subnet-12345678,subnet-87654321` |
 | `clusterName` | ECS cluster name | `my-cluster` |
 | `image` | Container image URI or path to Containerfile | `nginx:alpine` |
+| `containerPort` | Port that the container exposes | `80` |
+| `lbPort` | Load balancer port | `80` |
 
 ### Optional Parameters
 
@@ -131,8 +141,8 @@ AWS_PROFILE=dev cdk deploy \
 | `desiredCount` | 1 | Number of tasks to run |
 | `cpu` | 256 | CPU units for the task |
 | `memory` | 512 | Memory in MiB for the task |
-| `containerPort` | 80 | Port that the container exposes |
-| `lbPort` | 80 | Load balancer port |
+| `containerPort` | **Required** | Port that the container exposes |
+| `lbPort` | **Required** | Load balancer port |
 | `healthCheckPath` | `/` | Health check path |
 | `allowedCidr` | `0.0.0.0/0` | Allowed CIDR for ALB security group |
 | `logRetentionDays` | 7 | Log retention days |
@@ -200,6 +210,8 @@ Configure container-level health checks for production reliability:
 AWS_PROFILE=dev cdk deploy \
   --context vpcId=vpc-12345678 \
   --context image=nginx:alpine \
+  --context containerPort=80 \
+  --context lbPort=80 \
   --context healthCheck='{"command":["CMD-SHELL","curl -f http://localhost:80/ || exit 1"],"interval":30,"timeout":5,"startPeriod":60,"retries":3}'
 ```
 
@@ -211,6 +223,8 @@ Set container-level CPU and memory limits:
 AWS_PROFILE=dev cdk deploy \
   --context vpcId=vpc-12345678 \
   --context image=nginx:alpine \
+  --context containerPort=80 \
+  --context lbPort=80 \
   --context resourceLimits='{"cpu":256,"memory":512}'
 ```
 
@@ -222,6 +236,8 @@ Enable AWS Cloud Map service discovery for microservices:
 AWS_PROFILE=dev cdk deploy \
   --context vpcId=vpc-12345678 \
   --context image=nginx:alpine \
+  --context containerPort=80 \
+  --context lbPort=80 \
   --context serviceDiscovery='{"namespace":"myapp.local","serviceName":"api","dnsType":"A","ttl":10}'
 ```
 
@@ -233,6 +249,8 @@ Optimize costs with FARGATE_SPOT capacity provider:
 AWS_PROFILE=dev cdk deploy \
   --context vpcId=vpc-12345678 \
   --context image=nginx:alpine \
+  --context containerPort=80 \
+  --context lbPort=80 \
   --context capacityProvider=FARGATE_SPOT
 ```
 

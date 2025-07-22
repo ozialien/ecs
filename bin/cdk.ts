@@ -29,8 +29,8 @@ const config: EcsServiceConfig = {
   desiredCount: app.node.tryGetContext('desiredCount') || parseInt(process.env.DESIRED_COUNT || '1'),
   cpu: app.node.tryGetContext('cpu') || parseInt(process.env.CPU || '256'),
   memory: app.node.tryGetContext('memory') || parseInt(process.env.MEMORY || '512'),
-  containerPort: app.node.tryGetContext('containerPort') || parseInt(process.env.CONTAINER_PORT || '80'),
-  lbPort: app.node.tryGetContext('lbPort') || parseInt(process.env.LB_PORT || '80'),
+                containerPort: app.node.tryGetContext('containerPort') || parseInt(process.env.CONTAINER_PORT || ''),
+              lbPort: app.node.tryGetContext('lbPort') || parseInt(process.env.LB_PORT || ''),
   healthCheckPath: app.node.tryGetContext('healthCheckPath') || process.env.HEALTH_CHECK_PATH || '/',
   allowedCidr: app.node.tryGetContext('allowedCidr') || process.env.ALLOWED_CIDR || '0.0.0.0/0',
   environment: app.node.tryGetContext('env') || {},
@@ -47,8 +47,8 @@ const config: EcsServiceConfig = {
   valuesFile: app.node.tryGetContext('valuesFile'),
 };
 
-// Validate required parameters
-const requiredParams = ['vpcId', 'subnetIds', 'clusterName', 'image'];
+            // Validate required parameters
+            const requiredParams = ['vpcId', 'subnetIds', 'clusterName', 'image', 'containerPort', 'lbPort'];
 for (const param of requiredParams) {
   if (!config[param as keyof EcsServiceConfig]) {
     console.error(`❌ Error: Required parameter '${param}' is missing.`);

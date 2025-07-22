@@ -42,11 +42,11 @@ export interface EcsServiceConfig {
     memory?: number;
   };
   
-  /** Port that the container exposes (default: 80) */
-  containerPort?: number;
+  /** Port that the container exposes */
+  containerPort: number;
   
-  /** Load balancer port (default: 80) */
-  lbPort?: number;
+  /** Load balancer port */
+  lbPort: number;
   
   /** Health check path (default: '/') */
   healthCheckPath?: string;
