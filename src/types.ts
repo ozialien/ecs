@@ -36,6 +36,12 @@ export interface EcsServiceConfig {
   /** Memory in MiB for the task (default: 512) */
   memory?: number;
   
+  /** Container resource limits */
+  resourceLimits?: {
+    cpu?: number;
+    memory?: number;
+  };
+  
   /** Port that the container exposes (default: 80) */
   containerPort?: number;
   
@@ -44,6 +50,15 @@ export interface EcsServiceConfig {
   
   /** Health check path (default: '/') */
   healthCheckPath?: string;
+  
+  /** Container health check configuration */
+  healthCheck?: {
+    command?: string[];
+    interval?: cdk.Duration;
+    timeout?: cdk.Duration;
+    startPeriod?: cdk.Duration;
+    retries?: number;
+  };
   
   /** Allowed CIDR for ALB security group (default: '0.0.0.0/0') */
   allowedCidr?: string;
@@ -83,6 +98,23 @@ export interface EcsServiceConfig {
   
   /** Values file path for loading configuration from file */
   valuesFile?: string;
+  
+  /** Service discovery configuration */
+  serviceDiscovery?: {
+    namespace?: string;
+    serviceName?: string;
+    dnsType?: 'A' | 'SRV';
+    ttl?: number;
+  };
+  
+  /** Capacity provider configuration */
+  capacityProvider?: 'FARGATE' | 'FARGATE_SPOT';
+  
+  /** Graceful shutdown configuration */
+  gracefulShutdown?: {
+    stopTimeout?: cdk.Duration;
+    drainTimeout?: cdk.Duration;
+  };
 }
 
 /**

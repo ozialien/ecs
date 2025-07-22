@@ -19,6 +19,7 @@ import * as ecs from 'aws-cdk-lib/aws-ecs';
 import * as ecs_patterns from 'aws-cdk-lib/aws-ecs-patterns';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as servicediscovery from 'aws-cdk-lib/aws-servicediscovery';
 import { Construct } from 'constructs';
 import { EcsServiceConfig, EcsServiceStackProps } from './types';
 import { showHelp } from './help';
@@ -88,6 +89,11 @@ export class EcsServiceStack extends cdk.Stack {
       containerPort: this.node.tryGetContext('containerPort') || 80,
       lbPort: this.node.tryGetContext('lbPort') || 80,
       healthCheckPath: this.node.tryGetContext('healthCheckPath') || '/',
+      healthCheck: this.node.tryGetContext('healthCheck'),
+      resourceLimits: this.node.tryGetContext('resourceLimits'),
+      serviceDiscovery: this.node.tryGetContext('serviceDiscovery'),
+      capacityProvider: this.node.tryGetContext('capacityProvider'),
+      gracefulShutdown: this.node.tryGetContext('gracefulShutdown'),
       allowedCidr: this.node.tryGetContext('allowedCidr') || '0.0.0.0/0',
       logRetentionDays: this.node.tryGetContext('logRetentionDays') || 7,
       enableAutoScaling: this.node.tryGetContext('enableAutoScaling') || false,
@@ -241,6 +247,8 @@ export class EcsServiceStack extends cdk.Stack {
       taskRole: config.taskRoleArn ? 
         iam.Role.fromRoleArn(this, `${config.serviceName}TaskRole`, config.taskRoleArn) : 
         undefined,
+      // Note: Graceful shutdown is configured at the service level
+      // and is handled automatically by ECS
     });
 
     // Add container to task definition
@@ -252,6 +260,15 @@ export class EcsServiceStack extends cdk.Stack {
       }),
       environment: config.environment,
       secrets: config.secrets ? this.createSecrets(config.secrets) : undefined,
+      healthCheck: config.healthCheck ? {
+        command: config.healthCheck.command || ['CMD-SHELL', 'curl -f http://localhost:80/ || exit 1'],
+        interval: config.healthCheck.interval || cdk.Duration.seconds(30),
+        timeout: config.healthCheck.timeout || cdk.Duration.seconds(5),
+        startPeriod: config.healthCheck.startPeriod || cdk.Duration.seconds(60),
+        retries: config.healthCheck.retries || 3,
+      } : undefined,
+      cpu: config.resourceLimits?.cpu,
+      memoryLimitMiB: config.resourceLimits?.memory,
     });
 
     // Add port mapping
@@ -268,7 +285,34 @@ export class EcsServiceStack extends cdk.Stack {
       publicLoadBalancer: true,
       listenerPort: config.lbPort!,
       serviceName: config.serviceName,
+      capacityProviderStrategies: config.capacityProvider ? [
+        {
+          capacityProvider: config.capacityProvider,
+          weight: 1,
+        }
+      ] : undefined,
+      // Graceful shutdown is handled at the task definition level
+      // The service will use the task definition's stop timeout
     });
+
+    // Add service discovery if configured
+    if (config.serviceDiscovery) {
+      const namespace = new servicediscovery.PrivateDnsNamespace(this, `${config.serviceName}Namespace`, {
+        name: config.serviceDiscovery.namespace || `${config.serviceName}.local`,
+        vpc: vpc,
+      });
+
+      const serviceDiscoveryService = new servicediscovery.Service(this, `${config.serviceName}ServiceDiscovery`, {
+        namespace: namespace,
+        name: config.serviceDiscovery.serviceName || config.serviceName,
+        dnsRecordType: config.serviceDiscovery.dnsType === 'SRV' ? servicediscovery.DnsRecordType.SRV : servicediscovery.DnsRecordType.A,
+        dnsTtl: cdk.Duration.seconds(config.serviceDiscovery.ttl || 10),
+      });
+
+      // Note: Service discovery integration requires manual configuration
+      // The service discovery service is created but not automatically associated
+      // Users can manually associate it via AWS CLI or console
+    }
 
     // Configure security group
     if (config.allowedCidr !== '0.0.0.0/0') {

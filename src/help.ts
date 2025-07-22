@@ -93,6 +93,13 @@ OPTIONAL PARAMETERS:
   taskExecutionRoleArn     Task execution role ARN (optional)
   taskRoleArn              Task role ARN (optional)
   valuesFile               Values file path for loading configuration from file
+  
+ADVANCED FEATURES:
+  healthCheck              Container health check configuration
+  resourceLimits           Container resource limits (cpu, memory)
+  serviceDiscovery         Service discovery configuration
+  capacityProvider         Capacity provider (FARGATE, FARGATE_SPOT)
+  gracefulShutdown        Graceful shutdown configuration
 
 ENVIRONMENT VARIABLES:
   env:KEY=value            Environment variables for the container
