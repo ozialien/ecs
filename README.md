@@ -8,6 +8,16 @@ This package provides reusable CDK constructs for deploying ECS services with a 
 
 ## Installation
 
+### Global Installation (Recommended)
+
+```bash
+npm install -g @matson/ecs
+```
+
+This installs the `matson-ecs` CLI command globally.
+
+### Local Installation
+
 ```bash
 npm install @matson/ecs
 ```
@@ -33,6 +43,27 @@ app.synth();
 ```
 
 ## Usage
+
+### CLI Usage (Global Installation)
+
+```bash
+# Basic deployment
+matson-ecs deploy \
+  --vpcId vpc-12345678 \
+  --subnetIds subnet-12345678,subnet-87654321 \
+  --clusterName my-cluster \
+  --image nginx:alpine \
+  --containerPort 80 \
+  --lbPort 80
+
+# With values file
+matson-ecs deploy --valuesFile values.yaml
+
+# Show help
+matson-ecs help
+```
+
+### CDK Usage (Local Installation)
 
 ### Basic Deployment
 
