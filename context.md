@@ -68,6 +68,13 @@ Create a cdk deployment tool for deploying ecs environments.
 - **Test after each change** - Verify the app still works after each modification
 - **Update tests when code changes** - Always update and run tests when modifying code, ensure all tests pass before committing
 
+### Deployment Policy
+- **Always ask for deployment permission** - Never deploy automatically without explicit user approval
+- **Show deployment parameters** - Clearly display all parameters that will be used in the deployment
+- **Explain what will be deployed** - Describe the resources that will be created/modified
+- **Get confirmation** - Wait for explicit "yes" before proceeding with any deployment
+- **Document deployment requests** - Record deployment permission requests in context.md for future reference
+
 ### Mistakes AI Made
 
 #### 1. Encryption Feature - Made Optional Parameter Mandatory
@@ -218,6 +225,23 @@ Create a cdk deployment tool for deploying ecs environments.
   2. Don't hardcode config in codebase (which we don't - we use environment variables)
   3. Have sensible defaults for development (which the `|| 'default'` values provide)
 - **12-Factor Compliance**: The current implementation with environment variable fallbacks and sensible defaults is exactly correct for 12-factor principles
+
+#### 13. Over-Engineering Stack Names - Unnecessary Complexity
+- **Mistake**: Added unnecessary `stackName` parameter when `serviceName` was already working perfectly
+- **Issue**: Created complexity where none was needed - `serviceName` already provided unique stack names
+- **Problem**: Added redundant parameter and updated all construct IDs unnecessarily
+- **Anti-Pattern**: 
+  ```typescript
+  // WRONG - Unnecessary complexity
+  const stackName = config.stackName || config.serviceName || 'EcsServiceStack';
+  ```
+- **Correct Approach**:
+  ```typescript
+  // RIGHT - Use existing serviceName
+  const stackName = config.serviceName || 'EcsServiceStack';
+  ```
+- **Lesson**: Don't add new parameters when existing ones work perfectly. `serviceName` already provided unique stack names
+- **Context.md Compliance**: The original `serviceName` approach was already compliant with unique construct ID requirements
 
 #### 12. AI Assistant Claiming Comprehensive Implementation Without Proper Review - Quality Assessment Mistake
 - **Mistake**: AI assistant claimed the ECS CDK utility was "comprehensive" and "production-ready" without properly reviewing critical components
@@ -429,3 +453,39 @@ Create a cdk deployment tool for deploying ecs environments.
 - **Lesson**: When making changes that affect project structure, commit all related changes together. Don't leave structural changes uncommitted while only committing specific file modifications
 - **Requirement**: Always check git status and git diff before committing to ensure all related changes are included
 - **Follow-up**: Need to either commit the structural changes or restore them based on user preference
+
+#### 23. CDK Directory Structure Standard - Non-Negotiable Requirement
+- **Requirement**: MUST follow CDK standard directory structure without deviation
+- **Standard Structure**:
+  ```
+  bin/cdk.ts          # CDK app entry point
+  lib/                 # CDK constructs and utilities
+  dist/                # Compiled output (outDir)
+  cdk.json            # CDK configuration
+  ```
+- **Non-Negotiable**: 
+  - `bin/` contains CDK app entry point
+  - `lib/` contains CDK constructs
+  - `outDir` must be `dist/` to avoid conflicts with source `lib/`
+  - NEVER deviate from this structure
+- **Anti-Patterns**:
+  ```bash
+  # WRONG - Don't use src/ for CDK constructs
+  src/ecs-service-stack.ts
+  
+  # WRONG - Don't compile to lib/ (conflicts with source)
+  "outDir": "lib"
+  
+  # WRONG - Don't put CDK app in src/
+  src/bin/cdk.ts
+  ```
+- **Correct Pattern**:
+  ```bash
+  # RIGHT - Standard CDK structure
+  bin/cdk.ts
+  lib/ecs-service-stack.ts
+  tsconfig.json: "outDir": "dist"
+  ```
+- **Lesson**: CDK has established conventions. Follow them exactly. Don't try to be clever with directory structure
+- **Requirement**: All future changes must maintain this exact structure
+- **Follow-up**: Project now follows CDK standard structure correctly

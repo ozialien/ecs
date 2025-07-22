@@ -173,7 +173,7 @@ export class EcsServiceStack extends cdk.Stack {
       image: this.getContextValue('image', testConfig.image) ?? this.requireContext('image'),
 
       // Optional parameters with defaults
-      serviceName: this.getContextValue('serviceName', testConfig.serviceName) ?? this.stackName,
+      stackName: this.getContextValue('stackName', testConfig.stackName) ?? this.stackName,
       desiredCount: this.getNumericContextValue('desiredCount', testConfig.desiredCount) ?? DEFAULT_CONFIG.DESIRED_COUNT,
       cpu: this.getNumericContextValue('cpu', testConfig.cpu) ?? DEFAULT_CONFIG.CPU,
       memory: this.getNumericContextValue('memory', testConfig.memory) ?? DEFAULT_CONFIG.MEMORY,
@@ -335,7 +335,9 @@ export class EcsServiceStack extends cdk.Stack {
    * Create or import VPC based on VPC ID
    */
   private createOrImportVpc(vpcId: string): ec2.IVpc {
-    return ec2.Vpc.fromLookup(this, `${this.stackName}Vpc`, {
+    const config = this.loadConfiguration();
+    const stackName = config.stackName || this.stackName;
+    return ec2.Vpc.fromLookup(this, `${stackName}Vpc`, {
       vpcId: vpcId,
     });
   }
@@ -344,7 +346,9 @@ export class EcsServiceStack extends cdk.Stack {
    * Create or import ECS cluster
    */
   private createOrImportCluster(clusterName: string, vpc: ec2.IVpc): ecs.ICluster {
-    return ecs.Cluster.fromClusterAttributes(this, `${this.stackName}Cluster`, {
+    const config = this.loadConfiguration();
+    const stackName = config.stackName || this.stackName;
+    return ecs.Cluster.fromClusterAttributes(this, `${stackName}Cluster`, {
       clusterName: clusterName,
       vpc: vpc,
     });
@@ -370,8 +374,9 @@ export class EcsServiceStack extends cdk.Stack {
    * Create CloudWatch log group for the service
    */
   private createLogGroup(config: EcsServiceConfig): logs.LogGroup {
-    return new logs.LogGroup(this, `${config.serviceName}LogGroup`, {
-      logGroupName: config.logGroupName || `/ecs/${config.serviceName}`,
+    const stackName = config.stackName || this.stackName;
+    return new logs.LogGroup(this, `${stackName}LogGroup`, {
+      logGroupName: config.logGroupName || `/ecs/${config.stackName}`,
       retention: logs.RetentionDays.ONE_WEEK,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
@@ -381,7 +386,8 @@ export class EcsServiceStack extends cdk.Stack {
    * Create Fargate task definition
    */
   private createTaskDefinition(config: EcsServiceConfig): ecs.FargateTaskDefinition {
-    return new ecs.FargateTaskDefinition(this, `${config.serviceName}TaskDef`, {
+    const stackName = config.stackName || this.stackName;
+    return new ecs.FargateTaskDefinition(this, `${stackName}TaskDef`, {
       cpu: config.cpu,
       memoryLimitMiB: config.memory,
       executionRole: this.createExecutionRole(config),
@@ -393,12 +399,13 @@ export class EcsServiceStack extends cdk.Stack {
    * Create execution role with required permissions for ECS
    */
   private createExecutionRole(config: EcsServiceConfig): iam.IRole {
+    const stackName = config.stackName || this.stackName;
     if (config.taskExecutionRoleArn) {
-      return iam.Role.fromRoleArn(this, `${config.serviceName}ExecutionRole`, config.taskExecutionRoleArn);
+      return iam.Role.fromRoleArn(this, `${stackName}ExecutionRole`, config.taskExecutionRoleArn);
     }
 
     // Create execution role with required permissions
-    const executionRole = new iam.Role(this, `${config.serviceName}ExecutionRole`, {
+    const executionRole = new iam.Role(this, `${stackName}ExecutionRole`, {
       assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
       managedPolicies: [
         iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AmazonECSTaskExecutionRolePolicy'),
@@ -423,12 +430,13 @@ export class EcsServiceStack extends cdk.Stack {
    * Create task role with required permissions for the application
    */
   private createTaskRole(config: EcsServiceConfig): iam.IRole {
+    const stackName = config.stackName || this.stackName;
     if (config.taskRoleArn) {
-      return iam.Role.fromRoleArn(this, `${config.serviceName}TaskRole`, config.taskRoleArn);
+      return iam.Role.fromRoleArn(this, `${stackName}TaskRole`, config.taskRoleArn);
     }
 
     // Create task role for application permissions
-    const taskRole = new iam.Role(this, `${config.serviceName}TaskRole`, {
+    const taskRole = new iam.Role(this, `${stackName}TaskRole`, {
       assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
     });
 
@@ -454,11 +462,11 @@ export class EcsServiceStack extends cdk.Stack {
     taskDefinition: ecs.FargateTaskDefinition, 
     logGroup: logs.LogGroup
   ): ecs.ContainerDefinition {
-    const container = taskDefinition.addContainer(`${config.serviceName}Container`, {
+    const container = taskDefinition.addContainer(`${config.stackName}Container`, {
       image: this.createContainerImage(config.image),
       logging: ecs.LogDrivers.awsLogs({
         logGroup: logGroup,
-        streamPrefix: config.serviceName!,
+        streamPrefix: config.stackName!,
       }),
       environment: config.environment,
       secrets: config.secrets ? this.createSecrets(config.secrets) : undefined,
@@ -479,6 +487,10 @@ export class EcsServiceStack extends cdk.Stack {
    * Create health check configuration
    */
   private createHealthCheck(healthCheck?: EcsServiceConfig['healthCheck']): ecs.HealthCheck | undefined {
+    // Check if health check is explicitly disabled
+    if (healthCheck?.enabled === false) return undefined;
+    
+    // Check if health check has required configuration (existing logic)
     if (!healthCheck?.command) return undefined;
 
     return {
@@ -497,13 +509,14 @@ export class EcsServiceStack extends cdk.Stack {
     config: EcsServiceConfig, 
     taskDefinition: ecs.FargateTaskDefinition
   ): ecs_patterns.ApplicationLoadBalancedFargateService {
-    return new ecs_patterns.ApplicationLoadBalancedFargateService(this, `${config.serviceName}Service`, {
+    const stackName = config.stackName || this.stackName;
+    return new ecs_patterns.ApplicationLoadBalancedFargateService(this, `${stackName}Service`, {
       cluster: this.cluster,
       taskDefinition: taskDefinition,
       desiredCount: config.desiredCount,
       publicLoadBalancer: true,
       listenerPort: config.lbPort!,
-      serviceName: config.serviceName,
+      serviceName: config.stackName,
       capacityProviderStrategies: this.createCapacityProviderStrategies(config.capacityProvider),
     });
   }
@@ -524,16 +537,21 @@ export class EcsServiceStack extends cdk.Stack {
    * Configure service discovery if enabled
    */
   private configureServiceDiscovery(config: EcsServiceConfig, vpc: ec2.IVpc): void {
+    // Check if service discovery is explicitly disabled
+    if (config.serviceDiscovery?.enabled === false) return;
+    
+    // Check if service discovery configuration exists (existing logic)
     if (!config.serviceDiscovery) return;
 
-    const namespace = new servicediscovery.PrivateDnsNamespace(this, `${config.serviceName}Namespace`, {
-      name: config.serviceDiscovery.namespace || `${config.serviceName}.local`,
+    const stackName = config.stackName || this.stackName;
+    const namespace = new servicediscovery.PrivateDnsNamespace(this, `${stackName}Namespace`, {
+      name: config.serviceDiscovery.namespace || `${config.stackName}.local`,
       vpc: vpc,
     });
 
-    new servicediscovery.Service(this, `${config.serviceName}ServiceDiscovery`, {
+    new servicediscovery.Service(this, `${stackName}ServiceDiscovery`, {
       namespace: namespace,
-      name: config.serviceDiscovery.serviceName || config.serviceName,
+      name: config.serviceDiscovery.serviceName || config.stackName,
       dnsRecordType: config.serviceDiscovery.dnsType === 'SRV' ? 
         servicediscovery.DnsRecordType.SRV : 
         servicediscovery.DnsRecordType.A,
@@ -593,16 +611,17 @@ export class EcsServiceStack extends cdk.Stack {
    * Add auto scaling to the service
    */
   private addAutoScaling(config: EcsServiceConfig): void {
+    const stackName = config.stackName || this.stackName;
     const scaling = this.service.autoScaleTaskCount({
       minCapacity: config.minCapacity!,
       maxCapacity: config.maxCapacity!,
     });
 
-    scaling.scaleOnCpuUtilization(`${config.serviceName}CpuScaling`, {
+    scaling.scaleOnCpuUtilization(`${stackName}CpuScaling`, {
       targetUtilizationPercent: config.targetCpuUtilization!,
     });
 
-    scaling.scaleOnMemoryUtilization(`${config.serviceName}MemoryScaling`, {
+    scaling.scaleOnMemoryUtilization(`${stackName}MemoryScaling`, {
       targetUtilizationPercent: config.targetMemoryUtilization!,
     });
   }
@@ -611,22 +630,23 @@ export class EcsServiceStack extends cdk.Stack {
    * Add CloudFormation outputs
    */
   private addOutputs(config: EcsServiceConfig): void {
+    const stackName = config.stackName || this.stackName;
     new cdk.CfnOutput(this, 'ServiceName', {
-      value: config.serviceName!,
+      value: config.stackName!,
       description: 'ECS Service Name',
-      exportName: `${config.serviceName}-service-name`,
+      exportName: `${stackName}-service-name`,
     });
 
     new cdk.CfnOutput(this, 'LoadBalancerDNS', {
       value: this.loadBalancer.loadBalancer.loadBalancerDnsName,
       description: 'Load Balancer DNS Name',
-      exportName: `${config.serviceName}-load-balancer-dns`,
+      exportName: `${stackName}-load-balancer-dns`,
     });
 
     new cdk.CfnOutput(this, 'ClusterName', {
       value: config.clusterName,
       description: 'ECS Cluster Name',
-      exportName: `${config.serviceName}-cluster-name`,
+      exportName: `${stackName}-cluster-name`,
     });
   }
 

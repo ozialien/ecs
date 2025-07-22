@@ -104,6 +104,10 @@ ADVANCED FEATURES:
   gracefulShutdown        Graceful shutdown configuration
   placementStrategies      Task placement strategies (manual configuration)
 
+FEATURE ENABLEMENT:
+  All optional features support explicit enabled: true|false
+  Example: --context healthCheck='{"enabled":false}' to disable health checks
+
 ENVIRONMENT VARIABLES:
   env:KEY=value            Environment variables for the container
   Example: --context env:NODE_ENV=production --context env:API_KEY=secret

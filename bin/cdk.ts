@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 import * as cdk from 'aws-cdk-lib';
-import { EcsServiceStack } from '../src/ecs-service-stack';
-import { EcsServiceConfig } from '../src/types';
+import { EcsServiceStack } from '../lib/ecs-service-stack';
+import { EcsServiceConfig } from '../lib/types';
 
 /**
  * CDK App Entry Point
@@ -25,7 +25,7 @@ const config: EcsServiceConfig = {
   subnetIds: app.node.tryGetContext('subnetIds') || process.env.SUBNET_IDS?.split(','),
   clusterName: app.node.tryGetContext('clusterName') || process.env.CLUSTER_NAME,
   image: app.node.tryGetContext('image') || process.env.IMAGE,
-  serviceName: app.node.tryGetContext('serviceName') || process.env.SERVICE_NAME,
+  stackName: app.node.tryGetContext('stackName') || process.env.STACK_NAME,
   desiredCount: app.node.tryGetContext('desiredCount') || parseInt(process.env.DESIRED_COUNT || '1'),
   cpu: app.node.tryGetContext('cpu') || parseInt(process.env.CPU || '256'),
   memory: app.node.tryGetContext('memory') || parseInt(process.env.MEMORY || '512'),
@@ -49,8 +49,42 @@ const config: EcsServiceConfig = {
   valuesFile: app.node.tryGetContext('valuesFile'),
 };
 
+// Load from values file if specified
+if (config.valuesFile) {
+  const fs = require('fs');
+  const path = require('path');
+  
+  if (fs.existsSync(config.valuesFile)) {
+    try {
+      const fileContent = fs.readFileSync(config.valuesFile, 'utf8');
+      const ext = path.extname(config.valuesFile).toLowerCase();
+      
+      let values: any;
+      switch (ext) {
+        case '.js':
+          values = require(path.resolve(config.valuesFile));
+          break;
+        case '.yaml':
+        case '.yml':
+          const yaml = require('js-yaml');
+          values = yaml.load(fileContent);
+          break;
+        default:
+          values = JSON.parse(fileContent);
+      }
+      
+      // Merge values into config
+      Object.assign(config, values);
+    } catch (error) {
+      console.warn(`⚠️  Warning: Failed to parse values file ${config.valuesFile}: ${error}`);
+    }
+  } else {
+    console.warn(`⚠️  Warning: Values file not found: ${config.valuesFile}`);
+  }
+}
+
             // Validate required parameters
-            const requiredParams = ['vpcId', 'subnetIds', 'clusterName', 'image', 'containerPort', 'lbPort'];
+            const requiredParams = ['vpcId', 'subnetIds', 'clusterName', 'image', 'stackName', 'containerPort', 'lbPort'];
 for (const param of requiredParams) {
   if (!config[param as keyof EcsServiceConfig]) {
     console.error(`❌ Error: Required parameter '${param}' is missing.`);
@@ -63,8 +97,8 @@ for (const param of requiredParams) {
   }
 }
 
-// Create the ECS service stack
-new EcsServiceStack(app, 'EcsServiceStack', {
+// Create the ECS service stack using stack name
+new EcsServiceStack(app, config.stackName, {
   env: {
     account: process.env.CDK_DEFAULT_ACCOUNT,
     region: process.env.CDK_DEFAULT_REGION,

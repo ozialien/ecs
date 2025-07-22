@@ -193,6 +193,7 @@ AWS_PROFILE=dev cdk deploy \
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `serviceName` | Stack name | Service name |
+
 | `desiredCount` | 1 | Number of tasks to run |
 | `cpu` | 256 | CPU units for the task |
 | `memory` | 512 | Memory in MiB for the task |
@@ -371,6 +372,14 @@ AWS_PROFILE=dev cdk deploy \
   --context containerPort=80 \
   --context lbPort=80 \
   --context healthCheck='{"command":["CMD-SHELL","curl -f http://localhost:80/ || exit 1"],"interval":30,"timeout":5,"startPeriod":60,"retries":3}'
+
+# Disable health checks explicitly
+AWS_PROFILE=dev cdk deploy \
+  --context vpcId=vpc-12345678 \
+  --context image=nginx:alpine \
+  --context containerPort=80 \
+  --context lbPort=80 \
+  --context healthCheck='{"enabled":false}'
 ```
 
 #### Resource Limits

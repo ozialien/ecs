@@ -6,7 +6,7 @@
 
 import * as cdk from 'aws-cdk-lib';
 import { Template } from 'aws-cdk-lib/assertions';
-import { EcsServiceStack } from '../src/ecs-service-stack';
+import { EcsServiceStack } from '../lib/ecs-service-stack';
 
 describe('EcsServiceStack', () => {
   let app: cdk.App;
@@ -30,6 +30,7 @@ describe('EcsServiceStack', () => {
         region: 'us-west-2'
       },
       config: {
+        stackName: 'test-stack',
         vpcId: 'vpc-12345678',
         subnetIds: ['subnet-12345678', 'subnet-87654321'],
         clusterName: 'test-cluster',
@@ -81,11 +82,11 @@ describe('EcsServiceStack', () => {
         region: 'us-west-2'
       },
       config: {
+        stackName: 'test-stack',
         vpcId: 'vpc-12345678',
         subnetIds: ['subnet-12345678', 'subnet-87654321'],
         clusterName: 'test-cluster',
         image: 'nginx:alpine',
-        serviceName: 'custom-service',
         desiredCount: 3,
         cpu: 512,
         memory: 1024,
@@ -127,6 +128,7 @@ describe('EcsServiceStack', () => {
         region: 'us-west-2'
       },
       config: {
+        stackName: 'test-stack',
         vpcId: 'vpc-12345678',
         subnetIds: ['subnet-12345678', 'subnet-87654321'],
         clusterName: 'test-cluster',
@@ -174,6 +176,7 @@ describe('EcsServiceStack', () => {
         region: 'us-west-2'
       },
       config: {
+        stackName: 'test-stack',
         vpcId: 'vpc-12345678',
         subnetIds: ['subnet-12345678', 'subnet-87654321'],
         clusterName: 'test-cluster',
@@ -222,6 +225,7 @@ describe('EcsServiceStack', () => {
         region: 'us-west-2'
       },
       config: {
+        stackName: 'test-stack',
         vpcId: 'vpc-12345678',
         subnetIds: ['subnet-12345678', 'subnet-87654321'],
         clusterName: 'test-cluster',
@@ -267,6 +271,7 @@ describe('EcsServiceStack', () => {
         region: 'us-west-2'
       },
       config: {
+        stackName: 'test-stack',
         vpcId: 'vpc-12345678',
         subnetIds: ['subnet-12345678', 'subnet-87654321'],
         clusterName: 'test-cluster',
@@ -303,6 +308,7 @@ describe('EcsServiceStack', () => {
         region: 'us-west-2'
       },
       config: {
+        stackName: 'test-stack',
         vpcId: 'vpc-12345678',
         subnetIds: ['subnet-12345678', 'subnet-87654321'],
         clusterName: 'test-cluster',
@@ -338,6 +344,7 @@ describe('EcsServiceStack', () => {
         region: 'us-west-2'
       },
       config: {
+        stackName: 'test-stack',
         vpcId: 'vpc-12345678',
         subnetIds: ['subnet-12345678', 'subnet-87654321'],
         clusterName: 'test-cluster',
@@ -371,6 +378,7 @@ describe('EcsServiceStack', () => {
         region: 'us-west-2'
       },
       config: {
+        stackName: 'test-stack',
         vpcId: 'vpc-12345678',
         subnetIds: ['subnet-12345678', 'subnet-87654321'],
         clusterName: 'test-cluster',
@@ -404,6 +412,7 @@ describe('EcsServiceStack', () => {
         region: 'us-west-2'
       },
       config: {
+        stackName: 'test-stack',
         vpcId: 'vpc-12345678',
         subnetIds: ['subnet-12345678', 'subnet-87654321'],
         clusterName: 'test-cluster',
@@ -428,7 +437,8 @@ describe('EcsServiceStack', () => {
           region: 'us-west-2'
         },
         config: {
-          vpcId: 'vpc-12345678',
+          stackName: 'test-stack',
+        vpcId: 'vpc-12345678',
           subnetIds: ['subnet-12345678', 'subnet-87654321'],
           clusterName: 'test-cluster',
           image: 'nginx:alpine',
@@ -458,6 +468,7 @@ describe('EcsServiceStack', () => {
         region: 'us-west-2'
       },
       config: {
+        stackName: 'test-stack',
         vpcId: 'vpc-12345678',
         subnetIds: ['subnet-12345678', 'subnet-87654321'],
         clusterName: 'test-cluster',
@@ -489,6 +500,7 @@ describe('EcsServiceStack', () => {
         region: 'us-west-2'
       },
       config: {
+        stackName: 'test-stack',
         vpcId: 'vpc-12345678',
         subnetIds: ['subnet-12345678', 'subnet-87654321'],
         clusterName: 'test-cluster',
@@ -506,19 +518,19 @@ describe('EcsServiceStack', () => {
   });
 
   test('types are exported correctly', () => {
-    const mainExports = require('../src/index');
+    const mainExports = require('../lib/index');
     expect(mainExports).toHaveProperty('EcsServiceStack');
   });
 
   test('help system works', () => {
     expect(() => {
-      require('../src/help');
+      require('../lib/help');
     }).not.toThrow();
   });
 
   test('main index exports correctly', () => {
     expect(() => {
-      require('../src/index');
+      require('../lib/index');
     }).not.toThrow();
   });
 }); 

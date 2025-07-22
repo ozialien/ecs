@@ -5,7 +5,7 @@
 # Infrastructure configuration
 vpcId: vpc-42de9927
 subnetIds: subnet-103d3874,subnet-c56802b2
-clusterName: cas-erd-svc-matsonlabs-cluster
+clusterName: cas-erd-svc-cluster
 
 # Container configuration
 image: 275416279984.dkr.ecr.us-west-2.amazonaws.com/cas-erd-svc:2.0.0
@@ -13,7 +13,7 @@ containerPort: 8080
 lbPort: 80
 
 # Service configuration
-serviceName: cas-erd-svc
+stackName: cas-erd-svc
 desiredCount: 1
 cpu: 512
 memory: 1024
@@ -55,6 +55,7 @@ serviceDiscovery:
 
 # Health Check Configuration (matching existing CDK)
 healthCheck:
+  enabled: true  # Explicitly enable health checks
   command: ["CMD-SHELL", "curl -f http://localhost:8080/casreferenceservice/ || exit 1"]
   interval: 30
   timeout: 5

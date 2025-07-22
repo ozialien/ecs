@@ -24,8 +24,8 @@ export interface EcsServiceConfig {
   /** Container image URI or path to Containerfile */
   image: string;
   
-  /** Service name (defaults to stack name) */
-  serviceName?: string;
+  /** Stack name (required) */
+  stackName: string;
   
   /** Number of tasks to run (default: 1) */
   desiredCount?: number;
@@ -38,6 +38,7 @@ export interface EcsServiceConfig {
   
   /** Container resource limits */
   resourceLimits?: {
+    enabled?: boolean;
     cpu?: number;
     memory?: number;
   };
@@ -53,6 +54,7 @@ export interface EcsServiceConfig {
   
   /** Container health check configuration */
   healthCheck?: {
+    enabled?: boolean;
     command?: string[];
     interval?: cdk.Duration;
     timeout?: cdk.Duration;
@@ -117,6 +119,7 @@ export interface EcsServiceConfig {
   
   /** Service discovery configuration */
   serviceDiscovery?: {
+    enabled?: boolean;
     namespace?: string;
     serviceName?: string;
     dnsType?: 'A' | 'SRV';
@@ -128,12 +131,14 @@ export interface EcsServiceConfig {
   
   /** Graceful shutdown configuration */
   gracefulShutdown?: {
+    enabled?: boolean;
     stopTimeout?: cdk.Duration;
     drainTimeout?: cdk.Duration;
   };
   
   /** Task placement strategies */
   placementStrategies?: {
+    enabled?: boolean;
     type: 'spread' | 'binpack' | 'random';
     field?: string;
     value?: string;
