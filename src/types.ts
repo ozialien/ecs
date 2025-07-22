@@ -107,8 +107,8 @@ export interface EcsServiceConfig {
     };
   };
 
-  /** IAM permissions for execution role */
-  executionRolePermissions?: {
+  /** IAM permissions for task execution role */
+  taskExecutionRolePermissions?: {
     [service: string]: {
       actions: string[];
       resources: string[];

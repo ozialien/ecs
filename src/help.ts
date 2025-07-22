@@ -93,7 +93,7 @@ OPTIONAL PARAMETERS:
   taskExecutionRoleArn     Task execution role ARN (optional)
   taskRoleArn              Task role ARN (optional)
   taskRolePermissions      IAM permissions for task role (optional)
-  executionRolePermissions IAM permissions for execution role (optional)
+  taskExecutionRolePermissions IAM permissions for task execution role (optional)
   valuesFile               Values file path for loading configuration from file
   
 ADVANCED FEATURES:
@@ -114,7 +114,7 @@ SECRETS:
 
 IAM PERMISSIONS:
   taskRolePermissions       IAM permissions for task role (from values file)
-  executionRolePermissions  IAM permissions for execution role (from values file)
+  taskExecutionRolePermissions  IAM permissions for task execution role (from values file)
   Example: Define in values.yaml file (see examples/values-matsonlabs.yaml)
 
 VALUES FILE FORMAT:

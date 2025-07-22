@@ -209,7 +209,7 @@ AWS_PROFILE=dev cdk deploy \
 | `taskExecutionRoleArn` | - | Task execution role ARN |
 | `taskRoleArn` | - | Task role ARN |
 | `taskRolePermissions` | - | IAM permissions for task role |
-| `executionRolePermissions` | - | IAM permissions for execution role |
+| `taskExecutionRolePermissions` | - | IAM permissions for task execution role |
 | `valuesFile` | - | Values file path |
 
 ### Environment Variables
@@ -250,7 +250,7 @@ Configure IAM permissions for ECS tasks via values files. Common permissions inc
 - **RDS**: Database connections
 - **CloudWatch Metrics**: Application metrics
 
-#### Execution Role Permissions (Infrastructure-level permissions)
+#### Task Execution Role Permissions (Infrastructure-level permissions)
 - **ECR**: Pull container images
 - **Secrets Manager**: Access secrets during container startup
 - **CloudWatch Logs**: Write container logs
@@ -308,7 +308,7 @@ taskRolePermissions:
     resources:
       - arn:aws:dynamodb:us-west-2:123456789012:table/*
 
-executionRolePermissions:
+taskExecutionRolePermissions:
   ecr:
     actions:
       - ecr:GetAuthorizationToken
@@ -335,7 +335,6 @@ executionRolePermissions:
       - ssm:GetParametersByPath
     resources:
       - arn:aws:ssm:us-west-2:123456789012:parameter/*
-```
 
 ## Help
 

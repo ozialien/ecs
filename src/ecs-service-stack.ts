@@ -406,8 +406,8 @@ export class EcsServiceStack extends cdk.Stack {
     });
 
     // Add permissions from values file configuration
-    if (config.executionRolePermissions) {
-      Object.entries(config.executionRolePermissions).forEach(([service, permissions]) => {
+    if (config.taskExecutionRolePermissions) {
+      Object.entries(config.taskExecutionRolePermissions).forEach(([service, permissions]) => {
         executionRole.addToPolicy(new iam.PolicyStatement({
           effect: iam.Effect.ALLOW,
           actions: permissions.actions,

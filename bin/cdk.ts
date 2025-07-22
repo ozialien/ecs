@@ -45,7 +45,7 @@ const config: EcsServiceConfig = {
   taskExecutionRoleArn: app.node.tryGetContext('taskExecutionRoleArn') || process.env.TASK_EXECUTION_ROLE_ARN,
   taskRoleArn: app.node.tryGetContext('taskRoleArn') || process.env.TASK_ROLE_ARN,
   taskRolePermissions: app.node.tryGetContext('taskRolePermissions'),
-  executionRolePermissions: app.node.tryGetContext('executionRolePermissions'),
+  taskExecutionRolePermissions: app.node.tryGetContext('taskExecutionRolePermissions'),
   valuesFile: app.node.tryGetContext('valuesFile'),
 };
 

@@ -130,7 +130,7 @@ taskRolePermissions:
     resources:
       - "*"
 
-executionRolePermissions:
+taskExecutionRolePermissions:
   secretsManager:
     actions:
       - secretsmanager:GetSecretValue
