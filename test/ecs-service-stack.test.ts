@@ -13,6 +13,9 @@ describe('EcsServiceStack', () => {
 
   beforeEach(() => {
     app = new cdk.App();
+    // Set test mode to ensure VPC creation instead of import
+    app.node.setContext("testMode", true);
+    app = new cdk.App();
   });
 
   test('creates basic ECS service with minimal configuration', () => {

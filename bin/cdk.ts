@@ -34,17 +34,22 @@ if (valuesFile) {
       const ext = path.extname(valuesFile).toLowerCase();
       
       let values: any;
-      switch (ext) {
-        case '.js':
-          values = require(path.resolve(valuesFile));
-          break;
-        case '.yaml':
-        case '.yml':
-          const yaml = require('js-yaml');
-          values = yaml.load(fileContent);
-          break;
-        default:
-          values = JSON.parse(fileContent);
+      try {
+        switch (ext) {
+          case '.js':
+            values = require(path.resolve(valuesFile));
+            break;
+          case '.yaml':
+          case '.yml':
+            const yaml = require('js-yaml');
+            values = yaml.load(fileContent);
+            break;
+          default:
+            values = JSON.parse(fileContent);
+        }
+      } catch (error) {
+        console.error(`❌ Error parsing values file ${valuesFile}: ${error}`);
+        process.exit(1);
       }
       
       // Load values file into config
@@ -122,6 +127,31 @@ for (const param of requiredParams) {
     console.error('  cdk deploy -c valuesFile=values.yaml');
     process.exit(1);
   }
+}
+
+// Validate parameter formats
+if (config.vpcId && !config.vpcId.startsWith('vpc-')) {
+  console.error('❌ Error: Invalid VPC ID format. Must start with "vpc-"');
+  process.exit(1);
+}
+
+if (config.subnetIds && Array.isArray(config.subnetIds)) {
+  for (const subnetId of config.subnetIds) {
+    if (!subnetId.startsWith('subnet-')) {
+      console.error(`❌ Error: Invalid subnet ID format: ${subnetId}. Must start with "subnet-"`);
+      process.exit(1);
+    }
+  }
+}
+
+if (config.containerPort && (config.containerPort < 1 || config.containerPort > 65535)) {
+  console.error('❌ Error: Invalid container port. Must be between 1 and 65535');
+  process.exit(1);
+}
+
+if (config.lbPort && (config.lbPort < 1 || config.lbPort > 65535)) {
+  console.error('❌ Error: Invalid load balancer port. Must be between 1 and 65535');
+  process.exit(1);
 }
 
 // Create the ECS service stack using stack name

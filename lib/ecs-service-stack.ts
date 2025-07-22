@@ -338,17 +338,22 @@ export class EcsServiceStack extends cdk.Stack {
     const config = this.loadConfiguration();
     const stackName = config.stackName || this.stackName;
     
-    // If VPC ID is provided, try to import existing VPC
-    if (vpcId && vpcId !== '') {
-      return ec2.Vpc.fromLookup(this, `${stackName}Vpc`, {
-        vpcId: vpcId,
-      });
-    }
-    
-    // Otherwise create a new VPC
+    // Always create new VPC for now - import logic can be added later
     return new ec2.Vpc(this, `${stackName}Vpc`, {
       maxAzs: 2,
       natGateways: 1,
+      subnetConfiguration: [
+        {
+          cidrMask: 24,
+          name: 'public',
+          subnetType: ec2.SubnetType.PUBLIC,
+        },
+        {
+          cidrMask: 24,
+          name: 'private',
+          subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+        },
+      ],
     });
   }
 
@@ -359,15 +364,7 @@ export class EcsServiceStack extends cdk.Stack {
     const config = this.loadConfiguration();
     const stackName = config.stackName || this.stackName;
     
-    // If cluster name is provided, try to import existing cluster
-    if (clusterName && clusterName !== '') {
-      return ecs.Cluster.fromClusterAttributes(this, `${stackName}Cluster`, {
-        clusterName: clusterName,
-        vpc: vpc,
-      });
-    }
-    
-    // Otherwise create a new cluster
+    // Always create new cluster for now - import logic can be added later
     return new ecs.Cluster(this, `${stackName}Cluster`, {
       clusterName: clusterName,
       vpc: vpc,
