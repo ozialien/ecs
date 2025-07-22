@@ -208,6 +208,8 @@ AWS_PROFILE=dev cdk deploy \
 | `targetMemoryUtilization` | 70 | Target memory utilization for auto scaling |
 | `taskExecutionRoleArn` | - | Task execution role ARN |
 | `taskRoleArn` | - | Task role ARN |
+| `taskRolePermissions` | - | IAM permissions for task role |
+| `executionRolePermissions` | - | IAM permissions for execution role |
 | `valuesFile` | - | Values file path |
 
 ### Environment Variables
@@ -231,6 +233,108 @@ AWS_PROFILE=dev cdk deploy \
   --context clusterName=my-cluster \
   --context image=nginx:alpine \
   --context secret:DB_PASSWORD=arn:aws:secretsmanager:region:account:secret:db-password
+```
+
+### IAM Permissions
+
+Configure IAM permissions for ECS tasks via values files. Common permissions include:
+
+#### Task Role Permissions (Application-level permissions)
+- **Secrets Manager**: Access to secrets and configuration
+- **CloudWatch Logs**: Create and write application logs
+- **KMS**: Decrypt encrypted secrets and data
+- **STS**: Assume roles for cross-account access
+- **S3**: Read/write application data
+- **SQS/SNS**: Message queue operations
+- **DynamoDB**: Database operations
+- **RDS**: Database connections
+- **CloudWatch Metrics**: Application metrics
+
+#### Execution Role Permissions (Infrastructure-level permissions)
+- **ECR**: Pull container images
+- **Secrets Manager**: Access secrets during container startup
+- **CloudWatch Logs**: Write container logs
+- **SSM Parameter Store**: Access configuration parameters
+- **CloudWatch Metrics**: Infrastructure metrics
+
+```yaml
+# values.yaml
+taskRolePermissions:
+  secretsManager:
+    actions:
+      - secretsmanager:GetSecretValue
+      - secretsmanager:DescribeSecret
+      - secretsmanager:GetResourcePolicy
+    resources:
+      - arn:aws:secretsmanager:us-west-2:123456789012:secret:*
+  cloudWatchLogs:
+    actions:
+      - logs:CreateLogGroup
+      - logs:CreateLogStream
+      - logs:PutLogEvents
+      - logs:DescribeLogStreams
+    resources:
+      - "*"
+  kms:
+    actions:
+      - kms:Decrypt
+      - kms:DescribeKey
+    resources:
+      - arn:aws:kms:us-west-2:123456789012:key:*
+  s3:
+    actions:
+      - s3:GetObject
+      - s3:PutObject
+      - s3:DeleteObject
+      - s3:ListBucket
+    resources:
+      - arn:aws:s3:::my-app-bucket
+      - arn:aws:s3:::my-app-bucket/*
+  sqs:
+    actions:
+      - sqs:SendMessage
+      - sqs:ReceiveMessage
+      - sqs:DeleteMessage
+    resources:
+      - arn:aws:sqs:us-west-2:123456789012:*
+  dynamodb:
+    actions:
+      - dynamodb:GetItem
+      - dynamodb:PutItem
+      - dynamodb:UpdateItem
+      - dynamodb:DeleteItem
+      - dynamodb:Query
+      - dynamodb:Scan
+    resources:
+      - arn:aws:dynamodb:us-west-2:123456789012:table/*
+
+executionRolePermissions:
+  ecr:
+    actions:
+      - ecr:GetAuthorizationToken
+      - ecr:BatchCheckLayerAvailability
+      - ecr:GetDownloadUrlForLayer
+      - ecr:BatchGetImage
+    resources:
+      - "*"
+  secretsManager:
+    actions:
+      - secretsmanager:GetSecretValue
+    resources:
+      - arn:aws:secretsmanager:us-west-2:123456789012:secret:*
+  cloudWatchLogs:
+    actions:
+      - logs:CreateLogStream
+      - logs:PutLogEvents
+    resources:
+      - "*"
+  ssm:
+    actions:
+      - ssm:GetParameter
+      - ssm:GetParameters
+      - ssm:GetParametersByPath
+    resources:
+      - arn:aws:ssm:us-west-2:123456789012:parameter/*
 ```
 
 ## Help

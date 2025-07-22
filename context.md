@@ -197,6 +197,28 @@ Create a cdk deployment tool for deploying ecs environments.
 - **Lesson**: When shown a working example pattern, AI must follow that exact pattern and not revert to incorrect suggestions
 - **Requirement**: AI must study and follow the established patterns in working examples, not invent new patterns
 
+#### 12. Misunderstanding 12-Factor Principles - Removing Sensible Defaults
+- **Mistake**: AI tried to remove sensible defaults (`|| '1'`, `|| '256'`, etc.) from `bin/cdk.ts` claiming it violated 12-factor principles
+- **Issue**: Completely misunderstood what 12-factor Principle #3 "Config" actually means
+- **Problem**: Thought that having defaults like `|| '1'` for `desiredCount` or `|| '256'` for `cpu` violated 12-factor principles
+- **Anti-Pattern**: 
+  ```typescript
+  // WRONG - AI tried to remove these sensible defaults
+  desiredCount: app.node.tryGetContext('desiredCount') || parseInt(process.env.DESIRED_COUNT || '1'),
+  cpu: app.node.tryGetContext('cpu') || parseInt(process.env.CPU || '256'),
+  ```
+- **Correct Approach**:
+  ```typescript
+  // RIGHT - Sensible defaults are perfectly fine for 12-factor
+  desiredCount: app.node.tryGetContext('desiredCount') || parseInt(process.env.DESIRED_COUNT || '1'),
+  cpu: app.node.tryGetContext('cpu') || parseInt(process.env.CPU || '256'),
+  ```
+- **Lesson**: 12-Factor Principle #3 "Config" means:
+  1. Store config in environment (which we do with `process.env` fallbacks)
+  2. Don't hardcode config in codebase (which we don't - we use environment variables)
+  3. Have sensible defaults for development (which the `|| 'default'` values provide)
+- **12-Factor Compliance**: The current implementation with environment variable fallbacks and sensible defaults is exactly correct for 12-factor principles
+
 #### 12. AI Assistant Claiming Comprehensive Implementation Without Proper Review - Quality Assessment Mistake
 - **Mistake**: AI assistant claimed the ECS CDK utility was "comprehensive" and "production-ready" without properly reviewing critical components
 - **Issue**: Gave high completeness score (8.5/10) while missing fundamental flaws like proper image handling

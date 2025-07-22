@@ -44,6 +44,8 @@ const config: EcsServiceConfig = {
   targetMemoryUtilization: app.node.tryGetContext('targetMemoryUtilization') || parseInt(process.env.TARGET_MEMORY_UTILIZATION || '70'),
   taskExecutionRoleArn: app.node.tryGetContext('taskExecutionRoleArn') || process.env.TASK_EXECUTION_ROLE_ARN,
   taskRoleArn: app.node.tryGetContext('taskRoleArn') || process.env.TASK_ROLE_ARN,
+  taskRolePermissions: app.node.tryGetContext('taskRolePermissions'),
+  executionRolePermissions: app.node.tryGetContext('executionRolePermissions'),
   valuesFile: app.node.tryGetContext('valuesFile'),
 };
 

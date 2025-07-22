@@ -92,6 +92,8 @@ OPTIONAL PARAMETERS:
   targetMemoryUtilization  Target memory utilization for auto scaling (default: 70)
   taskExecutionRoleArn     Task execution role ARN (optional)
   taskRoleArn              Task role ARN (optional)
+  taskRolePermissions      IAM permissions for task role (optional)
+  executionRolePermissions IAM permissions for execution role (optional)
   valuesFile               Values file path for loading configuration from file
   
 ADVANCED FEATURES:
@@ -109,6 +111,11 @@ ENVIRONMENT VARIABLES:
 SECRETS:
   secret:KEY=arn           Secrets for the container
   Example: --context secret:DB_PASSWORD=arn:aws:secretsmanager:region:account:secret:db-password
+
+IAM PERMISSIONS:
+  taskRolePermissions       IAM permissions for task role (from values file)
+  executionRolePermissions  IAM permissions for execution role (from values file)
+  Example: Define in values.yaml file (see examples/values-matsonlabs.yaml)
 
 VALUES FILE FORMAT:
   JSON: values.json

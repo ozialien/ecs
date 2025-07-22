@@ -390,21 +390,60 @@ export class EcsServiceStack extends cdk.Stack {
   }
 
   /**
-   * Create execution role if ARN provided
+   * Create execution role with required permissions for ECS
    */
-  private createExecutionRole(config: EcsServiceConfig): iam.IRole | undefined {
-    return config.taskExecutionRoleArn ? 
-      iam.Role.fromRoleArn(this, `${config.serviceName}ExecutionRole`, config.taskExecutionRoleArn) : 
-      undefined;
+  private createExecutionRole(config: EcsServiceConfig): iam.IRole {
+    if (config.taskExecutionRoleArn) {
+      return iam.Role.fromRoleArn(this, `${config.serviceName}ExecutionRole`, config.taskExecutionRoleArn);
+    }
+
+    // Create execution role with required permissions
+    const executionRole = new iam.Role(this, `${config.serviceName}ExecutionRole`, {
+      assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
+      managedPolicies: [
+        iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AmazonECSTaskExecutionRolePolicy'),
+      ],
+    });
+
+    // Add permissions from values file configuration
+    if (config.executionRolePermissions) {
+      Object.entries(config.executionRolePermissions).forEach(([service, permissions]) => {
+        executionRole.addToPolicy(new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: permissions.actions,
+          resources: permissions.resources,
+        }));
+      });
+    }
+
+    return executionRole;
   }
 
   /**
-   * Create task role if ARN provided
+   * Create task role with required permissions for the application
    */
-  private createTaskRole(config: EcsServiceConfig): iam.IRole | undefined {
-    return config.taskRoleArn ? 
-      iam.Role.fromRoleArn(this, `${config.serviceName}TaskRole`, config.taskRoleArn) : 
-      undefined;
+  private createTaskRole(config: EcsServiceConfig): iam.IRole {
+    if (config.taskRoleArn) {
+      return iam.Role.fromRoleArn(this, `${config.serviceName}TaskRole`, config.taskRoleArn);
+    }
+
+    // Create task role for application permissions
+    const taskRole = new iam.Role(this, `${config.serviceName}TaskRole`, {
+      assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
+    });
+
+    // Add permissions from values file configuration
+    if (config.taskRolePermissions) {
+      Object.entries(config.taskRolePermissions).forEach(([service, permissions]) => {
+        taskRole.addToPolicy(new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: permissions.actions,
+          resources: permissions.resources,
+        }));
+      });
+    }
+
+    return taskRole;
   }
 
   /**

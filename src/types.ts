@@ -98,6 +98,22 @@ export interface EcsServiceConfig {
   
   /** Values file path for loading configuration from file */
   valuesFile?: string;
+
+  /** IAM permissions for task role */
+  taskRolePermissions?: {
+    [service: string]: {
+      actions: string[];
+      resources: string[];
+    };
+  };
+
+  /** IAM permissions for execution role */
+  executionRolePermissions?: {
+    [service: string]: {
+      actions: string[];
+      resources: string[];
+    };
+  };
   
   /** Service discovery configuration */
   serviceDiscovery?: {
