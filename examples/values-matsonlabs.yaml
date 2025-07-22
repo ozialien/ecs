@@ -53,15 +53,6 @@ serviceDiscovery:
   dnsType: A
   ttl: 60
 
-# Health Check Configuration (matching existing CDK)
-healthCheck:
-  enabled: true  # Explicitly enable health checks
-  command: ["CMD-SHELL", "curl -f http://localhost:8080/casreferenceservice/ || exit 1"]
-  interval: 30
-  timeout: 5
-  startPeriod: 60
-  retries: 3
-
 # IAM Permissions Configuration
 taskRolePermissions:
   secretsManager:
@@ -151,16 +142,20 @@ taskExecutionRolePermissions:
       - ecr:BatchGetImage
     resources:
       - "*"
-  # Additional commonly needed permissions
   ssm:
     actions:
-      - ssm:GetParameter
       - ssm:GetParameters
-      - ssm:GetParametersByPath
+      - ssm:GetParameter
     resources:
-      - arn:aws:ssm:us-west-2:275416279984:parameter/*
-  cloudWatchMetrics:
+      - "*"
+  kms:
     actions:
-      - cloudwatch:PutMetricData
+      - kms:Decrypt
+      - kms:DescribeKey
+    resources:
+      - arn:aws:kms:us-west-2:275416279984:key:*
+  sts:
+    actions:
+      - sts:AssumeRole
     resources:
       - "*" 
