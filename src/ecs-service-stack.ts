@@ -77,6 +77,9 @@ export class EcsServiceStack extends cdk.Stack {
       return;
     }
 
+    // Handle credential context parameters
+    this.handleCredentialContext();
+
     // Load and validate configuration
     const config = this.loadConfiguration();
     this.validateRequiredParameters(config);
@@ -102,6 +105,38 @@ export class EcsServiceStack extends cdk.Stack {
   private isHelpRequested(): boolean {
     const help = this.node.tryGetContext('help');
     return help === 'true' || help === true;
+  }
+
+  /**
+   * Handle credential context parameters
+   * Sets AWS credential environment variables from context
+   */
+  private handleCredentialContext(): void {
+    const awsProfile = this.node.tryGetContext('awsProfile');
+    const awsRoleArn = this.node.tryGetContext('awsRoleArn');
+    const awsAccessKeyId = this.node.tryGetContext('awsAccessKeyId');
+    const awsSecretAccessKey = this.node.tryGetContext('awsSecretAccessKey');
+    const awsSessionToken = this.node.tryGetContext('awsSessionToken');
+
+    if (awsProfile && typeof awsProfile === 'string') {
+      process.env.AWS_PROFILE = awsProfile;
+    }
+
+    if (awsRoleArn && typeof awsRoleArn === 'string') {
+      process.env.AWS_ROLE_ARN = awsRoleArn;
+    }
+
+    if (awsAccessKeyId && typeof awsAccessKeyId === 'string') {
+      process.env.AWS_ACCESS_KEY_ID = awsAccessKeyId;
+    }
+
+    if (awsSecretAccessKey && typeof awsSecretAccessKey === 'string') {
+      process.env.AWS_SECRET_ACCESS_KEY = awsSecretAccessKey;
+    }
+
+    if (awsSessionToken && typeof awsSessionToken === 'string') {
+      process.env.AWS_SESSION_TOKEN = awsSessionToken;
+    }
   }
 
   /**

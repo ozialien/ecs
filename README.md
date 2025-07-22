@@ -49,18 +49,42 @@ app.synth();
 ```bash
 # Basic deployment
 matson-ecs deploy \
-  --vpcId vpc-12345678 \
-  --subnetIds subnet-12345678,subnet-87654321 \
-  --clusterName my-cluster \
-  --image nginx:alpine \
-  --containerPort 80 \
-  --lbPort 80
+  --context vpcId=vpc-12345678 \
+  --context subnetIds=subnet-12345678,subnet-87654321 \
+  --context clusterName=my-cluster \
+  --context image=nginx:alpine \
+  --context containerPort=80 \
+  --context lbPort=80
+
+# With AWS profile
+matson-ecs deploy \
+  --profile prod \
+  --context vpcId=vpc-12345678 \
+  --context image=nginx:alpine \
+  --context containerPort=80 \
+  --context lbPort=80
+
+# With IAM role
+matson-ecs deploy \
+  --role-arn arn:aws:iam::123456789012:role/DeployRole \
+  --context vpcId=vpc-12345678 \
+  --context image=nginx:alpine \
+  --context containerPort=80 \
+  --context lbPort=80
 
 # With values file
-matson-ecs deploy --valuesFile values.yaml
+matson-ecs deploy --context valuesFile=values.yaml
+
+# With credentials via context
+matson-ecs deploy \
+  --context awsProfile=prod \
+  --context vpcId=vpc-12345678 \
+  --context image=nginx:alpine \
+  --context containerPort=80 \
+  --context lbPort=80
 
 # Show help
-matson-ecs help
+matson-ecs --help
 ```
 
 ### CDK Usage (Local Installation)
@@ -273,6 +297,56 @@ AWS_PROFILE=dev cdk deploy \
 ```
 
 #### Capacity Providers
+
+### Credential Support
+
+The CLI supports multiple AWS credential methods:
+
+#### 1. AWS Profile (Recommended)
+```bash
+# Set environment variable
+export AWS_PROFILE=prod
+matson-ecs deploy --context vpcId=vpc-12345678
+
+# Use --profile option
+matson-ecs deploy --profile prod --context vpcId=vpc-12345678
+
+# Use context parameter
+matson-ecs deploy --context awsProfile=prod --context vpcId=vpc-12345678
+```
+
+#### 2. IAM Role
+```bash
+# Use --role-arn option
+matson-ecs deploy --role-arn arn:aws:iam::123456789012:role/DeployRole --context vpcId=vpc-12345678
+
+# Use context parameter
+matson-ecs deploy --context awsRoleArn=arn:aws:iam::123456789012:role/DeployRole --context vpcId=vpc-12345678
+```
+
+#### 3. Explicit Credentials
+```bash
+# Set environment variables
+export AWS_ACCESS_KEY_ID=AKIA...
+export AWS_SECRET_ACCESS_KEY=...
+matson-ecs deploy --context vpcId=vpc-12345678
+
+# Use context parameters
+matson-ecs deploy \
+  --context awsAccessKeyId=AKIAIOSFODNN7EXAMPLE \
+  --context awsSecretAccessKey=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY \
+  --context awsSessionToken=AQoEXAMPLEH4aoAH0gNCAPyJxzrBlXWt6TresKlOLb8vPBrIwT \
+  --context vpcId=vpc-12345678 \
+  --context image=nginx:alpine \
+  --context containerPort=80 \
+  --context lbPort=80
+```
+
+#### 4. EC2 Instance Metadata
+```bash
+# Use --ec2creds option when running on EC2
+matson-ecs deploy --ec2creds --context vpcId=vpc-12345678
+```
 Optimize costs with FARGATE_SPOT capacity provider:
 
 ```bash
