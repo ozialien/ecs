@@ -1,0 +1,50 @@
+{
+  "name": "@matson/ecs",
+  "version": "1.0.0",
+  "description": "CDK constructs for ECS deployments with Helm-style configuration",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "test": "jest",
+    "cdk": "cdk",
+    "help": "cdk deploy --context help=true"
+  },
+  "keywords": [
+    "aws-cdk",
+    "ecs",
+    "deployment",
+    "infrastructure",
+    "cloudformation"
+  ],
+  "author": "Matson",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "aws-cdk": "^2.0.0",
+    "jest": "^29.5.0",
+    "ts-jest": "^29.1.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.0.0",
+    "constructs": "^10.0.0"
+  },
+  "peerDependencies": {
+    "aws-cdk-lib": "^2.0.0",
+    "constructs": "^10.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/matson/ecs-cdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/matson/ecs-cdk/issues"
+  },
+  "homepage": "https://github.com/matson/ecs-cdk#readme"
+} 

@@ -1,0 +1,28 @@
+{
+  "vpcId": "vpc-12345678",
+  "subnetIds": ["subnet-12345678", "subnet-87654321"],
+  "clusterName": "my-cluster",
+  "image": "nginx:alpine",
+  "serviceName": "myapp-api",
+  "desiredCount": 2,
+  "cpu": 512,
+  "memory": 1024,
+  "containerPort": 80,
+  "lbPort": 80,
+  "healthCheckPath": "/",
+  "allowedCidr": "0.0.0.0/0",
+  "logRetentionDays": 7,
+  "enableAutoScaling": true,
+  "minCapacity": 1,
+  "maxCapacity": 5,
+  "targetCpuUtilization": 70,
+  "targetMemoryUtilization": 70,
+  "environment": {
+    "NODE_ENV": "production",
+    "API_VERSION": "v1",
+    "LOG_LEVEL": "info"
+  },
+  "secrets": {
+    "DB_PASSWORD": "arn:aws:secretsmanager:us-west-2:123456789012:secret:db-password-abc123"
+  }
+} 

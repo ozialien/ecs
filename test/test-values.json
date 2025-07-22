@@ -1,0 +1,13 @@
+{
+  "vpcId": "vpc-12345678",
+  "subnetIds": ["subnet-12345678", "subnet-87654321"],
+  "clusterName": "test-cluster",
+  "image": "nginx:alpine",
+  "serviceName": "test-service-from-values",
+  "desiredCount": 2,
+  "cpu": 512,
+  "memory": 1024,
+  "enableAutoScaling": true,
+  "minCapacity": 1,
+  "maxCapacity": 5
+} 
