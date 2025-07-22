@@ -115,6 +115,13 @@ export interface EcsServiceConfig {
     stopTimeout?: cdk.Duration;
     drainTimeout?: cdk.Duration;
   };
+  
+  /** Task placement strategies */
+  placementStrategies?: {
+    type: 'spread' | 'binpack' | 'random';
+    field?: string;
+    value?: string;
+  }[];
 }
 
 /**

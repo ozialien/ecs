@@ -100,6 +100,7 @@ ADVANCED FEATURES:
   serviceDiscovery         Service discovery configuration
   capacityProvider         Capacity provider (FARGATE, FARGATE_SPOT)
   gracefulShutdown        Graceful shutdown configuration
+  placementStrategies      Task placement strategies (manual configuration)
 
 ENVIRONMENT VARIABLES:
   env:KEY=value            Environment variables for the container

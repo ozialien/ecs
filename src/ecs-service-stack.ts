@@ -20,6 +20,7 @@ import * as ecs_patterns from 'aws-cdk-lib/aws-ecs-patterns';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as servicediscovery from 'aws-cdk-lib/aws-servicediscovery';
+import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
 import { Construct } from 'constructs';
 import { EcsServiceConfig, EcsServiceStackProps } from './types';
 import { showHelp } from './help';
@@ -94,6 +95,7 @@ export class EcsServiceStack extends cdk.Stack {
       serviceDiscovery: this.node.tryGetContext('serviceDiscovery'),
       capacityProvider: this.node.tryGetContext('capacityProvider'),
       gracefulShutdown: this.node.tryGetContext('gracefulShutdown'),
+      placementStrategies: this.node.tryGetContext('placementStrategies'),
       allowedCidr: this.node.tryGetContext('allowedCidr') || '0.0.0.0/0',
       logRetentionDays: this.node.tryGetContext('logRetentionDays') || 7,
       enableAutoScaling: this.node.tryGetContext('enableAutoScaling') || false,
@@ -291,9 +293,11 @@ export class EcsServiceStack extends cdk.Stack {
           weight: 1,
         }
       ] : undefined,
-      // Graceful shutdown is handled at the task definition level
-      // The service will use the task definition's stop timeout
     });
+
+    // Note: Placement strategies are configured via AWS CLI or console
+    // as they require advanced ECS service configuration
+    // Example: aws ecs update-service --cluster my-cluster --service my-service --placement-strategy type=spread,field=attribute:ecs.availability-zone
 
     // Add service discovery if configured
     if (config.serviceDiscovery) {
