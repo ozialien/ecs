@@ -337,8 +337,18 @@ export class EcsServiceStack extends cdk.Stack {
   private createOrImportVpc(vpcId: string): ec2.IVpc {
     const config = this.loadConfiguration();
     const stackName = config.stackName || this.stackName;
-    return ec2.Vpc.fromLookup(this, `${stackName}Vpc`, {
-      vpcId: vpcId,
+    
+    // If VPC ID is provided, try to import existing VPC
+    if (vpcId && vpcId !== '') {
+      return ec2.Vpc.fromLookup(this, `${stackName}Vpc`, {
+        vpcId: vpcId,
+      });
+    }
+    
+    // Otherwise create a new VPC
+    return new ec2.Vpc(this, `${stackName}Vpc`, {
+      maxAzs: 2,
+      natGateways: 1,
     });
   }
 
@@ -348,9 +358,20 @@ export class EcsServiceStack extends cdk.Stack {
   private createOrImportCluster(clusterName: string, vpc: ec2.IVpc): ecs.ICluster {
     const config = this.loadConfiguration();
     const stackName = config.stackName || this.stackName;
-    return ecs.Cluster.fromClusterAttributes(this, `${stackName}Cluster`, {
+    
+    // If cluster name is provided, try to import existing cluster
+    if (clusterName && clusterName !== '') {
+      return ecs.Cluster.fromClusterAttributes(this, `${stackName}Cluster`, {
+        clusterName: clusterName,
+        vpc: vpc,
+      });
+    }
+    
+    // Otherwise create a new cluster
+    return new ecs.Cluster(this, `${stackName}Cluster`, {
       clusterName: clusterName,
       vpc: vpc,
+      containerInsights: true,
     });
   }
 
