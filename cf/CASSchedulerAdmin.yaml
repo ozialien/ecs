@@ -1,0 +1,546 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Parameters:
+  CertificateArn:
+    Type: String
+    Default: arn:aws:acm:us-west-2:275416279984:certificate/87de9dbf-75e1-4fef-badf-834846d72d02
+    AllowedValues:
+      - arn:aws:acm:us-west-2:275416279984:certificate/87de9dbf-75e1-4fef-badf-834846d72d02
+      #- arn:aws:acm:us-west-2:391044600437:certificate/3eb5b9f6-d746-4e34-a75a-4479e8b93ba7
+    AllowedPattern: '^.+$'
+    Description: ARN of an existing certificate which will be attached to the ALB created by the stack, to serve HTTPS traffic (PROD QA cert is default).
+  ClusterName:
+    Type: String
+    Default: casscheduler-cluster
+    AllowedPattern: '^.+$'
+  #casschedulerJNLPPort:
+  #  Type: Number
+  #  Default: 50000
+  Vpcid:
+    Type: String
+    Default: vpc-42de9927
+    AllowedValues:
+      - vpc-42de9927
+    Description: enter the active VPC ID for your environment, default is set for Labs.
+  Subnet1:
+    Type: String
+    Default: subnet-c56802b2
+    AllowedValues:
+      - subnet-c56802b2
+    Description: enter the AppServer Subnet1 ID for your environment, default is set for Labs.
+  Subnet2:
+    Type: String
+    Default: subnet-103d3874
+    AllowedValues:
+      - subnet-103d3874
+    Description: enter the AppServer Subnet2 ID for your environment, default is set for Labs.       
+  #FileSystemResource:
+  #  Type: String
+  #  Default: fs-96ab4190
+  #  AllowedValues:
+  #    - fs-96ab4190
+  #    - fs-c1504dc6
+  #  Description: home-casscheduler from EFS, default is set for PROD.
+  #AccessPointResource:
+  #  Type : String
+  #  Default : fsap-004063542501d0ed2
+  #  AllowedValues:
+  #    - fsap-004063542501d0ed2
+  #    - fsap-098493c69bfc35049
+  #  Description: home-casscheduler from EFS AccessPoint, default is set for PROD.
+  casschedulerRepo:
+    Type: String
+    Default: cas-snapshots/cas-scheduler-admin
+    AllowedValues:
+      - cas-snapshots/cas-scheduler-admin
+      #- casscheduler-aws-pp
+  casschedulerImageVersion:
+    # See tag immutable, required moving away from :latest for image tag
+    Type: String
+    Default: 3.2.8-snapshot
+    AllowedValues:
+      - 3.2.6-snapshot
+      - 3.2.7-snapshot
+      - 3.2.8-snapshot
+    #  - v2
+    #  - v2
+    #  - v3
+    #  - v4
+    #  - v5
+    #  - v6
+    #  - v7
+    #  - v8
+    #  - v9
+    #  - v10
+    #  - latest
+    Description: casscheduler-admin ECR repo, default is set for Labs. 
+  CpuSize:
+    Type: Number
+    Default: 2048
+    AllowedValues:
+      - 2048
+      - 4096
+    Description: enter the Cpu size for your environment, default is set for Labs.
+  MemorySize:
+    Type: Number
+    Default: 4096
+    AllowedValues:
+      - 4096
+      - 8192
+    Description: enter the Memory size for your environment, default is set for Labs.
+  HealthCheckSeconds:
+    Type: Number
+    Default: 600
+    AllowedValues:
+      - 600
+    Description: enter the HealthCheckGracePeriodSeconds value for your environment.            
+  #TrackCargoAcct:
+  #  Type: Number
+  #  Default: 689838003629
+  #  AllowedValues:
+  #    - 689838003629
+  #    - 163355195061
+  #  Description: choose the cargotrack prod or preprod account value for your environment, default is set for PROD.         
+  #MlscAcct:
+  #  Type: Number
+  #  Default: 129791073898
+  #  AllowedValues:
+  #    - 129791073898
+  #    - 594964311645
+  #  Description: choose the mlsc prod or preprod account value for your environment, default is set for PROD.
+  #SpanAcct:
+  #  Type: Number
+  #  Default: 110150137605
+  #  AllowedValues:
+  #    - 110150137605
+  #    - 008750303846
+  #  Description: choose the span prod or preprod account value for your environment, default is set for PROD.
+Resources:
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      IpAddressType: ipv4
+      Scheme: internal
+      Subnets:
+        - !Ref Subnet1
+        - !Ref Subnet2
+      SecurityGroups:
+        - !Ref LoadBalancerSecurityGroup
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: CasSchedLoadBalancerSecurityGroup
+      GroupDescription: Security group for load balancer
+      VpcId: !Ref Vpcid
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 10.0.0.0/8
+        #- IpProtocol: tcp
+        #  FromPort: 80
+        #  ToPort: 80
+        #  CidrIp: 10.0.0.0/8
+        - IpProtocol: tcp
+          FromPort: 9090
+          ToPort: 9090
+          CidrIp: 10.0.0.0/8                  
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          DestinationSecurityGroupId: !Ref casschedulerSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 9090
+          ToPort: 9090
+          DestinationSecurityGroupId: !Ref casschedulerSecurityGroup 
+  LoadBalancerListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      Certificates:
+        - CertificateArn: !Ref CertificateArn
+      DefaultActions:
+        - Type: forward
+          ForwardConfig:
+            TargetGroups:
+              - TargetGroupArn: !Ref casschedulerTargetGroup
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      #Port: 80
+      #Protocol: HTTP
+  casschedulerTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckPath: /CASSchedulerAdmin/info
+      Name: casschedulerTargetGroup
+      Port: 8080
+      Protocol: HTTP
+      TargetType: ip
+      VpcId: !Ref Vpcid
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: 300
+  casschedulerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: casschedulerSecurityGroup
+      GroupDescription: Security group for casscheduler
+      VpcId: !Ref Vpcid
+  casschedulerLoadBalancerSecurityGroupIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      IpProtocol: tcp
+      FromPort: 8080
+      ToPort: 8080
+      GroupId: !Ref casschedulerSecurityGroup
+      SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
+  #casschedulercasschedulerAgentSecurityGroupIngress:
+  #  Type: AWS::EC2::SecurityGroupIngress
+  #  Properties:
+  #    IpProtocol: tcp
+  #    FromPort: !Ref casschedulerJNLPPort
+  #    ToPort: !Ref casschedulerJNLPPort
+  #    GroupId: !Ref casschedulerSecurityGroup
+  #    SourceSecurityGroupId: !Ref casschedulerAgentSecurityGroup
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Ref ClusterName
+  #cassRepositorycheduler:
+  #  Type: AWS::ECR::Repository
+  #  Properties:
+  #    RepositoryName: 
+        #casscheduler-jboss-aws
+        #casscheduler-aws
+  #      !Ref casschedulerRepo
+  casschedulerExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: casscheduler-execution-role
+      Path: /
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+  casschedulerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: casscheduler-role
+      Path: /
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+      Policies:
+        #- PolicyName: root
+        #  PolicyDocument:
+        #    Version: '2012-10-17'
+        #    Statement:
+        #      - Effect: Allow
+        #        Action:
+        #          - elasticfilesystem:ClientMount
+        #          - elasticfilesystem:ClientWrite
+        #          - elasticfilesystem:Restore
+        #        Resource: !Sub arn:aws:elasticfilesystem:${AWS::Region}:${AWS::AccountId}:file-system/${FileSystemResource}
+        - PolicyName: ec2-access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:DescribeInstances
+                  - ec2:StartInstances
+                  - ec2:StopInstances
+                Resource: '*'
+        - PolicyName: IAM-Permissions-ECSExec
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssmmessages:CreateControlChannel
+                  - ssmmessages:CreateDataChannel
+                  - ssmmessages:OpenControlChannel
+                  - ssmmessages:OpenDataChannel
+                Resource: '*'
+        #- PolicyName: cross-account-cargotrack-ec2-describe-policy
+        #  PolicyDocument:
+        #    Version: '2012-10-17'
+        #    Statement:
+        #      - Effect: Allow
+        #        Action:
+        #          - sts:AssumeRole
+        #        Resource: !Sub arn:aws:iam::${TrackCargoAcct}:role/cross_account_ec2_describe_role
+        #- PolicyName: cross-account-mlsc-ec2-describe-policy
+        #  PolicyDocument:
+        #    Version: '2012-10-17'
+        #    Statement:
+        #      - Effect: Allow
+        #        Action:
+        #          - sts:AssumeRole
+        #        Resource: !Sub arn:aws:iam::${MlscAcct}:role/cross_account_ec2_describe_role                
+        #- PolicyName: cross-account-span-ec2-describe-policy
+        #  PolicyDocument:
+        #    Version: '2012-10-17'
+        #    Statement:
+        #      - Effect: Allow
+        #        Action:
+        #          - sts:AssumeRole
+        #        Resource: !Sub arn:aws:iam::${SpanAcct}:role/cross_account_ec2_describe_role   
+        - PolicyName: create-casscheduler-agents
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                  - ecs:ListTagsForResource
+                  - ecs:RegisterTaskDefinition
+                  - ecs:ListClusters
+                  - ecs:DescribeContainerInstances
+                  - ecs:ListTaskDefinitions
+                  - ecs:DescribeTaskDefinition
+                  - ecs:DeregisterTaskDefinition
+                Effect: Allow
+                Resource: '*'
+              - Action:
+                  - ecs:ListContainerInstances
+                Effect: Allow
+                Resource:
+                  - !Sub arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:cluster/${ClusterName}
+              - Action:
+                  - ecs:RunTask
+                Effect: Allow
+                Condition:
+                  ArnEquals:
+                    ecs:cluster:
+                      - !Sub arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:cluster/${ClusterName}
+                Resource: !Sub arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:task-definition/*
+              - Action:
+                  - ecs:StopTask
+                Effect: Allow
+                Condition:
+                  ArnEquals:
+                    ecs:cluster:
+                      - !Sub arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:cluster/${ClusterName}
+                Resource: !Sub arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:task/*
+              - Action:
+                  - ecs:DescribeTasks
+                Effect: Allow
+                Condition:
+                  ArnEquals:
+                    ecs:cluster:
+                      - !Sub arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:cluster/${ClusterName}
+                Resource: !Sub arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:task/*
+              - Action:
+                  - iam:GetRole
+                  - iam:PassRole
+                Effect: Allow
+                Resource: !GetAtt casschedulerExecutionRole.Arn
+  casschedulerTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub casscheduler-task
+      Cpu: !Ref CpuSize
+      Memory: !Ref MemorySize
+      NetworkMode: awsvpc
+      TaskRoleArn: !Ref casschedulerRole
+      ExecutionRoleArn: !Ref casschedulerExecutionRole
+      RequiresCompatibilities:
+        - FARGATE
+        - EC2
+      ContainerDefinitions:
+        - Name: casscheduler
+        #  ReadonlyRootFilesystem: true # enabled
+          #Image: casscheduler/casscheduler:lts
+          Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${casschedulerRepo}:${casschedulerImageVersion}
+          Environment:
+            - Name: ALLOW_EMPTY_PASSWORD
+              Value: "yes"
+          PortMappings:
+            - ContainerPort: 8080
+        #    - ContainerPort: !Ref casschedulerJNLPPort
+          MountPoints:
+        #    - SourceVolume: "casscheduler-home"
+        #      ContainerPath: "/var/casscheduler_home"
+        #      ReadOnly: false
+            - SourceVolume: "tmp"
+              ContainerPath: "/tmp"
+        #      ReadOnly: false
+            - SourceVolume: "var-lib-amazon"
+              ContainerPath: "/var/lib/amazon"
+        #      ReadOnly: false
+            - SourceVolume: "var-log-amazon"
+              ContainerPath: "/var/log/amazon"
+        #      ReadOnly: false
+            - SourceVolume: "var-cache-fontconfig"
+              ContainerPath: "/var/cache/fontconfig"
+        #      ReadOnly: false 
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref CloudwatchLogsGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: casscheduler
+        - Name: permission-container
+          ReadonlyRootFilesystem: true # enabled
+          Image: busybox:latest
+          #PortMappings: []
+          #Essential: !Ref RequiredContainer
+          Essential: false
+          EntryPoint:
+            - sh 
+            - "-c"
+          Command:
+          -
+          #- |-
+            !Sub |
+              chmod 0777 /tmp
+          MountPoints:
+            - SourceVolume: "tmp"
+              ContainerPath: "/tmp"
+              ReadOnly: false
+            - SourceVolume: "var-lib-amazon"
+              ContainerPath: "/var/lib/amazon"
+              ReadOnly: false
+            - SourceVolume: "var-log-amazon"
+              ContainerPath: "/var/log/amazon"
+              ReadOnly: false
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref CloudwatchLogsGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: casscheduler
+      Volumes:
+        #- Name: "casscheduler-home"
+        #  EFSVolumeConfiguration:
+        #    FilesystemId: !Ref FileSystemResource
+        #    TransitEncryption: ENABLED
+        #    AuthorizationConfig:
+        #      AccessPointId: !Ref AccessPointResource
+        #      IAM: ENABLED
+        - Name: "var-lib-amazon"
+        - Name: "var-log-amazon"
+        - Name: "tmp"
+        - Name: "var-cache-fontconfig"   
+  CloudwatchLogsGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join ['-', [ECSLogGroup, !Ref 'AWS::StackName']]
+      RetentionInDays: 14
+  casschedulerService:
+    Type: AWS::ECS::Service
+    DependsOn: LoadBalancerListener
+    Properties:
+      Cluster: !Ref ECSCluster
+      TaskDefinition: !Ref casschedulerTaskDefinition
+      DesiredCount: 1
+      HealthCheckGracePeriodSeconds: !Ref HealthCheckSeconds
+      LaunchType: FARGATE
+      PlatformVersion: LATEST
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 100
+        MaximumPercent: 200
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          Subnets:
+            - !Ref Subnet1
+            - !Ref Subnet2
+          SecurityGroups:
+            - !GetAtt casschedulerSecurityGroup.GroupId
+      LoadBalancers:
+        - ContainerName: casscheduler
+          ContainerPort: 8080
+          TargetGroupArn: !Ref casschedulerTargetGroup
+      #ServiceRegistries:
+      #  - RegistryArn: !GetAtt DiscoveryService.Arn
+      #    Port: !Ref casschedulerJNLPPort
+  #EFSSecurityGroup:
+  #  Type: AWS::EC2::SecurityGroup
+  #  Properties:
+  #    VpcId: !Ref Vpcid
+  #    GroupDescription: Enable EFS access via port 2049
+  #    SecurityGroupIngress:
+  #      - IpProtocol: tcp
+  #        FromPort: 2049
+  #        ToPort: 2049
+  #        SourceSecurityGroupId: !Ref casschedulerSecurityGroup
+  #      - IpProtocol: tcp
+  #        FromPort: 2049
+  #        ToPort: 2049
+  #        CidrIp: 10.0.0.0/8
+  #FileSystemResource:
+   # Type: AWS::EFS::FileSystem
+    #Properties:
+     # Encrypted: true
+      #FileSystemTags:
+       # - Key: Name
+        #  Value: casscheduler-home
+  #MountTargetResource1:
+   # Type: AWS::EFS::MountTarget
+    #Properties:
+     # FileSystemId: !Ref FileSystemResource
+      #SubnetId: !Ref Subnet1
+      #SecurityGroups:
+       # - !GetAtt EFSSecurityGroup.GroupId
+  #MountTargetResource2:
+   # Type: AWS::EFS::MountTarget
+    #Properties:
+     # FileSystemId: !Ref FileSystemResource
+      #SubnetId: !Ref Subnet2
+      #SecurityGroups:
+       # - !GetAtt EFSSecurityGroup.GroupId
+  #AccessPointResource:
+   # Type: AWS::EFS::AccessPoint
+    #Properties:
+     # FileSystemId: !Ref FileSystemResource
+      #PosixUser:
+       # Uid: '1000'
+        #Gid: '1000'
+      #RootDirectory:
+       # CreationInfo:
+        #  OwnerGid: '1000'
+         # OwnerUid: '1000'
+          #Permissions: '755'
+        #Path: '/casscheduler-home'
+  #casschedulerAgentSecurityGroup:
+  #  Type: AWS::EC2::SecurityGroup
+  #  Properties:
+  #    GroupName: casschedulerAgentSecurityGroup
+  #    GroupDescription: Security group for casscheduler agents
+  #    VpcId: !Ref Vpcid
+  PrivateNamespace:
+    Type: AWS::ServiceDiscovery::PrivateDnsNamespace
+    Properties:
+      Name: !Ref AWS::StackName
+      Vpc: !Ref Vpcid
+  DiscoveryService:
+    Type: AWS::ServiceDiscovery::Service
+    Properties:
+      DnsConfig:
+        RoutingPolicy: MULTIVALUE
+        DnsRecords:
+          - TTL: 60
+            Type: A
+          - TTL: 60
+            Type: SRV
+      Name: casscheduler
+      NamespaceId: !Ref PrivateNamespace
+Outputs:
+  LoadBalancerDNSName:
+    Value: !GetAtt LoadBalancer.DNSName
+  PrivateSubnet1:
+    Value: !Ref Subnet1
+  PrivateSubnet2:
+    Value: !Ref Subnet2
+#  casschedulerAgentSecurityGroup:
+#    Value: !Ref casschedulerAgentSecurityGroup
+  casschedulerExecutionRole:
+    Value: !GetAtt casschedulerExecutionRole.Arn
+
