@@ -5,20 +5,25 @@
 # Infrastructure configuration
 vpcId: vpc-42de9927
 subnetIds: subnet-103d3874,subnet-c56802b2
+securityGroupIds: sg-0a97935f67ae5717e
 clusterName: cas-erd-svc-cluster
 
 # Container configuration
 image: 275416279984.dkr.ecr.us-west-2.amazonaws.com/cas-erd-svc:2.0.0
 containerPort: 8080
 lbPort: 80
+registryDomain: 275416279984.dkr.ecr.us-west-2.amazonaws.com
+repositoryName: cas-erd-svc
+tag: 2.0.0
 
 # Service configuration
-stackName: cas-erd-svc
+stackName: cas-erd-svc-v2
 desiredCount: 1
 cpu: 512
 memory: 1024
 
 # Load balancer configuration (Private IP only)
+publicLoadBalancer: false  # Private IP only deployment
 healthCheckPath: /casreferenceservice/  # Health check endpoint from existing CDK
 allowedCidr: 10.120.0.0/24  # CIDR from existing CDK configuration
 

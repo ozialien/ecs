@@ -18,6 +18,9 @@ export interface EcsServiceConfig {
   /** Subnet IDs for the ECS service (comma-separated string or array) */
   subnetIds: string | string[];
   
+  /** Security Group IDs for the ECS service (comma-separated string or array) */
+  securityGroupIds?: string | string[];
+  
   /** ECS cluster name where the service will be deployed */
   clusterName: string;
   
@@ -143,6 +146,18 @@ export interface EcsServiceConfig {
     field?: string;
     value?: string;
   }[];
+  
+  /** Whether the load balancer should be public (default: true) */
+  publicLoadBalancer?: boolean;
+  
+  /** ECR registry domain */
+  registryDomain?: string;
+  
+  /** ECR repository name */
+  repositoryName?: string;
+  
+  /** ECR image tag */
+  tag?: string;
 }
 
 /**
