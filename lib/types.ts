@@ -169,6 +169,54 @@ export interface EcsServiceConfig {
   
   /** ECR image tag */
   tag?: string;
+
+  /** SSL certificate ARN for HTTPS load balancer */
+  certificateArn?: string;
+
+  /** Load balancer protocol (HTTP or HTTPS) */
+  lbProtocol?: 'HTTP' | 'HTTPS';
+
+  /** Additional containers to run alongside main container */
+  additionalContainers?: {
+    name: string;
+    image: string;
+    essential?: boolean;
+    readonlyRootFilesystem?: boolean;
+    environment?: { [key: string]: string };
+    command?: string[];
+    entryPoint?: string[];
+    portMappings?: {
+      containerPort: number;
+      protocol?: 'tcp' | 'udp';
+    }[];
+    mountPoints?: {
+      sourceVolume: string;
+      containerPath: string;
+      readOnly?: boolean;
+    }[];
+  }[];
+
+  /** Volume configurations */
+  volumes?: {
+    name: string;
+    efsVolumeConfiguration?: {
+      fileSystemId: string;
+      transitEncryption?: 'ENABLED' | 'DISABLED';
+      authorizationConfig?: {
+        accessPointId: string;
+        iam: 'ENABLED' | 'DISABLED';
+      };
+    };
+  }[];
+
+  /** Health check grace period in seconds */
+  healthCheckGracePeriodSeconds?: number;
+
+  /** Deployment configuration */
+  deploymentConfiguration?: {
+    minimumHealthyPercent?: number;
+    maximumPercent?: number;
+  };
 }
 
 /**

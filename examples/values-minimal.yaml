@@ -1,37 +1,31 @@
-# values-matsonlabs.yaml for cas-erd-svc deployment (Private IP Only)
-# Values extracted from matsonlabs environment in cdk.json
-# IAM permissions based on existing CDK stack implementation
+# values-minimal.yaml for cas-erd-svc deployment (Minimal Configuration)
+# Demonstrates optional features - no volumes, no additional containers, HTTP only
 
 # Infrastructure configuration
 vpcId: vpc-42de9927
 subnetIds: subnet-103d3874,subnet-c56802b2
-securityGroupIds: sg-0a97935f67ae5717e
 clusterName: cas-erd-svc-cluster
 
 # Container configuration
 image: 275416279984.dkr.ecr.us-west-2.amazonaws.com/cas-erd-svc:2.0.0
 containerPort: 8080
-registryDomain: 275416279984.dkr.ecr.us-west-2.amazonaws.com
-repositoryName: cas-erd-svc
-tag: 2.0.0
 
 # Service configuration
-stackName: cas-erd-svc-v2
+stackName: cas-erd-svc-v2-minimal
 desiredCount: 1
 cpu: 512
 memory: 1024
 
-# Load balancer configuration (Private IP only)
+# Load balancer configuration (HTTP only - minimal)
 publicLoadBalancer: false  # Private IP only deployment
-lbProtocol: HTTPS  # Use HTTPS with certificate (optional - can be HTTP)
-certificateArn: arn:aws:acm:us-west-2:275416279984:certificate/87de9dbf-75e1-4fef-badf-834846d72d02  # Required for HTTPS
-healthCheckPath: /CASSchedulerAdmin/info  # Health check endpoint from CloudFormation
-lbPort: 443  # HTTPS port (use 80 for HTTP)
+lbProtocol: HTTP  # Use HTTP (no certificate needed)
+healthCheckPath: /casreferenceservice/  # Health check endpoint
+lbPort: 80  # HTTP port
 
-# Load balancer health check configuration (optional - uses defaults if not specified)
+# Load balancer health check configuration
 loadBalancerHealthCheck:
   enabled: true
-  path: /CASSchedulerAdmin/info  # Override healthCheckPath if specified
+  path: /casreferenceservice/
   healthyHttpCodes: '200'
   interval: 30  # seconds
   timeout: 5    # seconds
@@ -41,35 +35,8 @@ loadBalancerHealthCheck:
 # Health check grace period
 healthCheckGracePeriodSeconds: 600
 
-# Additional containers (like permission-container in CloudFormation)
-additionalContainers:
-  - name: permission-container
-    image: busybox:latest
-    essential: false
-    readonlyRootFilesystem: true
-    entryPoint:
-      - sh
-      - "-c"
-    command:
-      - |
-        chmod 0777 /tmp
-    mountPoints:
-      - sourceVolume: tmp
-        containerPath: /tmp
-        readOnly: false
-      - sourceVolume: var-lib-amazon
-        containerPath: /var/lib/amazon
-        readOnly: false
-      - sourceVolume: var-log-amazon
-        containerPath: /var/log/amazon
-        readOnly: false
-
-# Volume configurations
-volumes:
-  - name: var-lib-amazon
-  - name: var-log-amazon
-  - name: tmp
-  - name: var-cache-fontconfig
+# Volumes: NOT specified (optional)
+# additionalContainers: NOT specified (optional)
 
 allowedCidr: 10.120.0.0/24  # CIDR from existing CDK configuration
 

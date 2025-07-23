@@ -1,6 +1,5 @@
-# values-matsonlabs.yaml for cas-erd-svc deployment (Private IP Only)
-# Values extracted from matsonlabs environment in cdk.json
-# IAM permissions based on existing CDK stack implementation
+# values-matsonlabs-http.yaml for cas-erd-svc deployment (HTTP Only)
+# HTTP version without SSL certificate
 
 # Infrastructure configuration
 vpcId: vpc-42de9927
@@ -16,22 +15,22 @@ repositoryName: cas-erd-svc
 tag: 2.0.0
 
 # Service configuration
-stackName: cas-erd-svc-v2
+stackName: cas-erd-svc-v2-http
 desiredCount: 1
 cpu: 512
 memory: 1024
 
-# Load balancer configuration (Private IP only)
+# Load balancer configuration (HTTP only)
 publicLoadBalancer: false  # Private IP only deployment
-lbProtocol: HTTPS  # Use HTTPS with certificate (optional - can be HTTP)
-certificateArn: arn:aws:acm:us-west-2:275416279984:certificate/87de9dbf-75e1-4fef-badf-834846d72d02  # Required for HTTPS
-healthCheckPath: /CASSchedulerAdmin/info  # Health check endpoint from CloudFormation
-lbPort: 443  # HTTPS port (use 80 for HTTP)
+lbProtocol: HTTP  # Use HTTP (no certificate needed)
+# certificateArn: not specified for HTTP
+healthCheckPath: /casreferenceservice/  # Health check endpoint
+lbPort: 80  # HTTP port
 
-# Load balancer health check configuration (optional - uses defaults if not specified)
+# Load balancer health check configuration
 loadBalancerHealthCheck:
   enabled: true
-  path: /CASSchedulerAdmin/info  # Override healthCheckPath if specified
+  path: /casreferenceservice/
   healthyHttpCodes: '200'
   interval: 30  # seconds
   timeout: 5    # seconds

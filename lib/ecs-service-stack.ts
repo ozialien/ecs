@@ -512,6 +512,81 @@ export class EcsServiceStack extends cdk.Stack {
       protocol: ecs.Protocol.TCP,
     });
 
+    // Add mount points for main container if volumes are specified (optional)
+    if (config.volumes && config.volumes.length > 0) {
+      config.volumes.forEach(volume => {
+        container.addMountPoints({
+          sourceVolume: volume.name,
+          containerPath: `/${volume.name}`,
+          readOnly: false,
+        });
+      });
+    }
+
+    // Add additional containers if specified
+    if (config.additionalContainers) {
+      config.additionalContainers.forEach((containerConfig, index) => {
+        const additionalContainer = taskDefinition.addContainer(`${config.stackName}AdditionalContainer${index}`, {
+          image: this.createContainerImage(containerConfig.image),
+          logging: ecs.LogDrivers.awsLogs({
+            logGroup: logGroup,
+            streamPrefix: `${config.stackName}-${containerConfig.name}`,
+          }),
+          environment: containerConfig.environment,
+          essential: containerConfig.essential ?? false,
+          readonlyRootFilesystem: containerConfig.readonlyRootFilesystem,
+          command: containerConfig.command,
+          entryPoint: containerConfig.entryPoint,
+        });
+
+        // Add port mappings if specified
+        if (containerConfig.portMappings) {
+          containerConfig.portMappings.forEach(portMapping => {
+            additionalContainer.addPortMappings({
+              containerPort: portMapping.containerPort,
+              protocol: portMapping.protocol === 'udp' ? ecs.Protocol.UDP : ecs.Protocol.TCP,
+            });
+          });
+        }
+
+        // Add mount points if specified
+        if (containerConfig.mountPoints) {
+          containerConfig.mountPoints.forEach(mountPoint => {
+            additionalContainer.addMountPoints({
+              sourceVolume: mountPoint.sourceVolume,
+              containerPath: mountPoint.containerPath,
+              readOnly: mountPoint.readOnly ?? false,
+            });
+          });
+        }
+      });
+    }
+
+        // Add volumes if specified (optional)
+    if (config.volumes && config.volumes.length > 0) {
+      config.volumes.forEach(volume => {
+        if (volume.efsVolumeConfiguration) {
+          taskDefinition.addVolume({
+            name: volume.name,
+            efsVolumeConfiguration: {
+              fileSystemId: volume.efsVolumeConfiguration.fileSystemId,
+              transitEncryption: volume.efsVolumeConfiguration.transitEncryption === 'ENABLED' ? 
+                'ENABLED' : 'DISABLED',
+              authorizationConfig: volume.efsVolumeConfiguration.authorizationConfig ? {
+                accessPointId: volume.efsVolumeConfiguration.authorizationConfig.accessPointId,
+                iam: volume.efsVolumeConfiguration.authorizationConfig.iam === 'ENABLED' ? 
+                  'ENABLED' : 'DISABLED',
+              } : undefined,
+            },
+          });
+        } else {
+          taskDefinition.addVolume({
+            name: volume.name,
+          });
+        }
+      });
+    }
+
     return container;
   }
 
@@ -542,14 +617,29 @@ export class EcsServiceStack extends cdk.Stack {
     taskDefinition: ecs.FargateTaskDefinition
   ): ecs_patterns.ApplicationLoadBalancedFargateService {
     const stackName = config.stackName || this.stackName;
+    
+    // Determine protocol and certificate - HTTPS is optional
+    const protocol = config.lbProtocol || 'HTTP';
+    const certificate = config.certificateArn ? 
+      cdk.aws_certificatemanager.Certificate.fromCertificateArn(this, `${stackName}Certificate`, config.certificateArn) : 
+      undefined;
+
+    // Use HTTPS only if explicitly configured with certificate
+    const useHttps = protocol === 'HTTPS' && certificate;
+    const listenerPort = useHttps ? (config.lbPort || 443) : (config.lbPort || 80);
+
     const service = new ecs_patterns.ApplicationLoadBalancedFargateService(this, `${stackName}Service`, {
       cluster: this.cluster,
       taskDefinition: taskDefinition,
       desiredCount: config.desiredCount,
       publicLoadBalancer: config.publicLoadBalancer !== false, // Default to true unless explicitly set to false
-      listenerPort: config.lbPort!,
+      listenerPort: listenerPort,
+      protocol: useHttps ? elbv2.ApplicationProtocol.HTTPS : elbv2.ApplicationProtocol.HTTP,
+      certificate: certificate,
       serviceName: config.stackName,
       capacityProviderStrategies: this.createCapacityProviderStrategies(config.capacityProvider),
+      healthCheckGracePeriod: config.healthCheckGracePeriodSeconds ? 
+        cdk.Duration.seconds(config.healthCheckGracePeriodSeconds) : undefined,
     });
 
     // Configure health check on the target group
@@ -619,12 +709,22 @@ export class EcsServiceStack extends cdk.Stack {
     service: ecs_patterns.ApplicationLoadBalancedFargateService, 
     config: EcsServiceConfig
   ): void {
-    if (config.allowedCidr === DEFAULT_CONFIG.ALLOWED_CIDR) return;
-
-    service.loadBalancer.connections.allowFromAnyIpv4(
-      ec2.Port.tcp(config.lbPort!),
-      `Allow HTTP from ${config.allowedCidr}`
-    );
+    // Configure load balancer security group to be more restrictive
+    const lbSecurityGroup = service.loadBalancer.connections.securityGroups[0];
+    
+    // Determine protocol and port for security group
+    const protocol = config.lbProtocol || 'HTTP';
+    const useHttps = protocol === 'HTTPS' && config.certificateArn;
+    const lbPort = useHttps ? (config.lbPort || 443) : (config.lbPort || 80);
+    
+    // Remove default 0.0.0.0/0 rule and add specific CIDR
+    if (config.allowedCidr && config.allowedCidr !== DEFAULT_CONFIG.ALLOWED_CIDR) {
+      lbSecurityGroup.addIngressRule(
+        ec2.Peer.ipv4(config.allowedCidr),
+        ec2.Port.tcp(lbPort),
+        `Allow ${protocol} from ${config.allowedCidr}`
+      );
+    }
   }
 
   /**
