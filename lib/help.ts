@@ -83,6 +83,7 @@ OPTIONAL PARAMETERS:
   containerPort            Port that the container exposes (required)
   lbPort                   Load balancer port (required)
   healthCheckPath          Health check path (default: '/')
+  loadBalancerHealthCheck  Load balancer health check configuration
   allowedCidr              Allowed CIDR for ALB security group (default: '0.0.0.0/0')
   logRetentionDays         Log retention days (default: 7)
   enableAutoScaling        Whether to enable auto scaling (default: false)
@@ -98,6 +99,7 @@ OPTIONAL PARAMETERS:
   
 ADVANCED FEATURES:
   healthCheck              Container health check configuration
+  loadBalancerHealthCheck  Load balancer health check configuration
   resourceLimits           Container resource limits (cpu, memory)
   serviceDiscovery         Service discovery configuration
   capacityProvider         Capacity provider (FARGATE, FARGATE_SPOT)

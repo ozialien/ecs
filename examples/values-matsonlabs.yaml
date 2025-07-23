@@ -25,6 +25,17 @@ memory: 1024
 # Load balancer configuration (Private IP only)
 publicLoadBalancer: false  # Private IP only deployment
 healthCheckPath: /casreferenceservice/  # Health check endpoint from existing CDK
+
+# Load balancer health check configuration (optional - uses defaults if not specified)
+loadBalancerHealthCheck:
+  enabled: true
+  path: /casreferenceservice/  # Override healthCheckPath if specified
+  healthyHttpCodes: '200'
+  interval: 30  # seconds
+  timeout: 5    # seconds
+  healthyThresholdCount: 2
+  unhealthyThresholdCount: 3
+
 allowedCidr: 10.120.0.0/24  # CIDR from existing CDK configuration
 
 # Auto scaling (optional)

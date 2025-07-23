@@ -55,6 +55,17 @@ export interface EcsServiceConfig {
   /** Health check path (default: '/') */
   healthCheckPath?: string;
   
+  /** Load balancer health check configuration */
+  loadBalancerHealthCheck?: {
+    enabled?: boolean;
+    path?: string;
+    healthyHttpCodes?: string;
+    interval?: cdk.Duration;
+    timeout?: cdk.Duration;
+    healthyThresholdCount?: number;
+    unhealthyThresholdCount?: number;
+  };
+  
   /** Container health check configuration */
   healthCheck?: {
     enabled?: boolean;

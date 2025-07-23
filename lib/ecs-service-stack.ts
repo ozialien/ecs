@@ -382,7 +382,7 @@ export class EcsServiceStack extends cdk.Stack {
     return new ecs.Cluster(this, `${stackName}Cluster`, {
       clusterName: clusterName,
       vpc: vpc,
-      containerInsights: true,
+      containerInsightsV2: ecs.ContainerInsights.ENABLED,
     });
   }
 
@@ -553,15 +553,17 @@ export class EcsServiceStack extends cdk.Stack {
     });
 
     // Configure health check on the target group
-    if (config.healthCheckPath) {
+    if (config.healthCheckPath || config.loadBalancerHealthCheck) {
       const targetGroup = service.targetGroup;
+      const healthCheckConfig = config.loadBalancerHealthCheck || {};
+      
       targetGroup.configureHealthCheck({
-        path: config.healthCheckPath,
-        healthyHttpCodes: '200',
-        interval: cdk.Duration.seconds(30),
-        timeout: cdk.Duration.seconds(5),
-        healthyThresholdCount: 2,
-        unhealthyThresholdCount: 3,
+        path: healthCheckConfig.path || config.healthCheckPath || '/',
+        healthyHttpCodes: healthCheckConfig.healthyHttpCodes || '200',
+        interval: this.convertToDuration(healthCheckConfig.interval) || cdk.Duration.seconds(30),
+        timeout: this.convertToDuration(healthCheckConfig.timeout) || cdk.Duration.seconds(5),
+        healthyThresholdCount: healthCheckConfig.healthyThresholdCount || 2,
+        unhealthyThresholdCount: healthCheckConfig.unhealthyThresholdCount || 3,
       });
     }
 
@@ -695,6 +697,17 @@ export class EcsServiceStack extends cdk.Stack {
       description: 'ECS Cluster Name',
       exportName: `${stackName}-cluster-name`,
     });
+  }
+
+  /**
+   * Convert a value to CDK Duration
+   * Handles both Duration objects and numbers (seconds)
+   */
+  private convertToDuration(value: any): cdk.Duration | undefined {
+    if (!value) return undefined;
+    if (value instanceof cdk.Duration) return value;
+    if (typeof value === 'number') return cdk.Duration.seconds(value);
+    return undefined;
   }
 
   /**

@@ -67,7 +67,7 @@ if (valuesFile) {
 // Only override if the context parameter actually exists
 const contextKeys = [
   'vpcId', 'subnetIds', 'clusterName', 'image', 'stackName', 'desiredCount', 
-  'cpu', 'memory', 'containerPort', 'lbPort', 'healthCheckPath', 'allowedCidr',
+  'cpu', 'memory', 'containerPort', 'lbPort', 'healthCheckPath', 'loadBalancerHealthCheck', 'allowedCidr',
   'env', 'secret', 'logGroupName', 'logRetentionDays', 'enableAutoScaling',
   'minCapacity', 'maxCapacity', 'targetCpuUtilization', 'targetMemoryUtilization',
   'taskExecutionRoleArn', 'taskRoleArn', 'taskRolePermissions', 'taskExecutionRolePermissions'
