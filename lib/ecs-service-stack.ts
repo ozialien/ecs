@@ -29,7 +29,7 @@ import * as path from 'path';
 
 // Local imports
 import { Construct } from 'constructs';
-import { EcsServiceConfig, EcsServiceStackProps } from './types';
+import { EcsServiceConfig, EcsServiceStackProps, ContainerHealthCheck } from './types';
 import { showHelp } from './help';
 import { ConfigMapper } from './config-mapper';
 
@@ -601,7 +601,9 @@ export class EcsServiceStack extends cdk.Stack {
         return acc;
       }, {} as { [key: string]: string }) || {},
       secrets: mainContainer.secrets?.reduce((acc, secret) => {
-        acc[secret.name] = ecs.Secret.fromSecretsManager(secret.valueFrom);
+        acc[secret.name] = ecs.Secret.fromSecretsManager(
+          cdk.aws_secretsmanager.Secret.fromSecretCompleteArn(this, `${secret.name}Secret`, secret.valueFrom)
+        );
         return acc;
       }, {} as { [key: string]: ecs.Secret }) || undefined,
       healthCheck: this.createHealthCheck(mainContainer.healthCheck),
@@ -638,7 +640,10 @@ export class EcsServiceStack extends cdk.Stack {
             logGroup: logGroup,
             streamPrefix: `${config.metadata?.name || 'AdditionalContainer'}-${containerConfig.name}`,
           }),
-          environment: containerConfig.environment,
+          environment: containerConfig.environment?.reduce((acc, env) => {
+            acc[env.name] = env.value;
+            return acc;
+          }, {} as { [key: string]: string }) || {},
           essential: containerConfig.essential ?? false,
           readonlyRootFilesystem: containerConfig.readonlyRootFilesystem,
           command: containerConfig.command,
@@ -699,7 +704,7 @@ export class EcsServiceStack extends cdk.Stack {
   /**
    * Create health check configuration
    */
-  private createHealthCheck(healthCheck?: EcsServiceConfig['healthCheck']): ecs.HealthCheck | undefined {
+  private createHealthCheck(healthCheck?: ContainerHealthCheck): ecs.HealthCheck | undefined {
     // Check if health check is explicitly disabled
     if (healthCheck?.enabled === false) return undefined;
     
@@ -722,30 +727,30 @@ export class EcsServiceStack extends cdk.Stack {
     config: EcsServiceConfig, 
     taskDefinition: ecs.FargateTaskDefinition
   ): ecs_patterns.ApplicationLoadBalancedFargateService {
-    const stackName = config.stackName || this.stackName;
+    const stackName = config.metadata?.name || this.stackName;
     
     // Determine protocol and certificate - HTTPS is optional
-    const protocol = config.lbProtocol || 'HTTP';
-    const certificate = config.certificateArn ? 
-      cdk.aws_certificatemanager.Certificate.fromCertificateArn(this, `${stackName}Certificate`, config.certificateArn) : 
+    const protocol = config.loadBalancer.protocol || 'HTTP';
+    const certificate = config.loadBalancer.certificateArn ? 
+      cdk.aws_certificatemanager.Certificate.fromCertificateArn(this, `${stackName}Certificate`, config.loadBalancer.certificateArn) : 
       undefined;
 
     // Use HTTPS only if explicitly configured with certificate
     const useHttps = protocol === 'HTTPS' && certificate;
-    const listenerPort = useHttps ? (config.lbPort || 443) : (config.lbPort || 80);
+    const listenerPort = useHttps ? (config.loadBalancer.port || 443) : (config.loadBalancer.port || 80);
 
     const service = new ecs_patterns.ApplicationLoadBalancedFargateService(this, `${stackName}Service`, {
       cluster: this.cluster,
       taskDefinition: taskDefinition,
-      desiredCount: config.desiredCount,
-      publicLoadBalancer: config.publicLoadBalancer !== false, // Default to true unless explicitly set to false
+      desiredCount: config.service.desiredCount,
+      publicLoadBalancer: true, // Default to true
       listenerPort: listenerPort,
       protocol: useHttps ? elbv2.ApplicationProtocol.HTTPS : elbv2.ApplicationProtocol.HTTP,
       certificate: certificate,
-      serviceName: config.stackName,
-      capacityProviderStrategies: this.createCapacityProviderStrategies(config.capacityProvider),
-      healthCheckGracePeriod: config.healthCheckGracePeriodSeconds ? 
-        cdk.Duration.seconds(config.healthCheckGracePeriodSeconds) : undefined,
+      serviceName: stackName,
+      capacityProviderStrategies: this.createCapacityProviderStrategies(),
+      healthCheckGracePeriod: config.service.healthCheckGracePeriodSeconds ? 
+        cdk.Duration.seconds(config.service.healthCheckGracePeriodSeconds) : undefined,
     });
 
     // Configure health check on the target group

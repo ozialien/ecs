@@ -314,6 +314,9 @@ export interface EcsServiceConfig {
   
   /** Service discovery configuration */
   serviceDiscovery?: ServiceDiscovery;
+  
+  /** Values file path for loading configuration */
+  valuesFile?: string;
 }
 
 /**
