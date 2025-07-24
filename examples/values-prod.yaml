@@ -1,5 +1,5 @@
 # Production Environment Values
-# Usage: cdk deploy --values examples/values-prod.yaml
+# Usage: cdk deploy -c valuesFile=examples/values-prod.yaml
 
 vpcId: vpc-87654321
 subnetIds: 

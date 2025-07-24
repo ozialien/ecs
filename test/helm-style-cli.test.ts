@@ -35,18 +35,21 @@ memory: 512
     }
   });
 
-  test('should parse --values flag correctly', () => {
-    // This test verifies that the CLI can parse the --values flag
+  test('should parse -c valuesFile= flag correctly', () => {
+    // This test verifies that the CLI can parse the -c valuesFile= flag
     // In a real scenario, we would test the actual CDK app execution
     expect(() => {
       // Simulate the CLI argument parsing logic
-      const args = ['--values', testValuesFile, '-c', 'image=nginx:latest'];
+      const args = ['-c', `valuesFile=${testValuesFile}`, '-c', 'image=nginx:latest'];
       let valuesFile: string | undefined;
       
       for (let i = 0; i < args.length; i++) {
-        if (args[i] === '--values' && i + 1 < args.length) {
-          valuesFile = args[i + 1];
-          break;
+        if (args[i] === '-c' && i + 1 < args.length) {
+          const contextArg = args[i + 1];
+          if (contextArg.startsWith('valuesFile=')) {
+            valuesFile = contextArg.split('=')[1];
+            break;
+          }
         }
       }
       
@@ -54,15 +57,18 @@ memory: 512
     }).not.toThrow();
   });
 
-  test('should handle missing --values argument', () => {
+  test('should handle missing valuesFile argument', () => {
     expect(() => {
-      const args = ['--values']; // Missing argument
+      const args = ['-c']; // Missing argument
       let valuesFile: string | undefined;
       
       for (let i = 0; i < args.length; i++) {
-        if (args[i] === '--values' && i + 1 < args.length) {
-          valuesFile = args[i + 1];
-          break;
+        if (args[i] === '-c' && i + 1 < args.length) {
+          const contextArg = args[i + 1];
+          if (contextArg.startsWith('valuesFile=')) {
+            valuesFile = contextArg.split('=')[1];
+            break;
+          }
         }
       }
       
@@ -70,15 +76,18 @@ memory: 512
     }).not.toThrow();
   });
 
-  test('should handle --values with overrides', () => {
+  test('should handle -c valuesFile= with overrides', () => {
     expect(() => {
-      const args = ['--values', testValuesFile, '-c', 'image=nginx:latest', '-c', 'cpu=512'];
+      const args = ['-c', `valuesFile=${testValuesFile}`, '-c', 'image=nginx:latest', '-c', 'cpu=512'];
       let valuesFile: string | undefined;
       
       for (let i = 0; i < args.length; i++) {
-        if (args[i] === '--values' && i + 1 < args.length) {
-          valuesFile = args[i + 1];
-          break;
+        if (args[i] === '-c' && i + 1 < args.length) {
+          const contextArg = args[i + 1];
+          if (contextArg.startsWith('valuesFile=')) {
+            valuesFile = contextArg.split('=')[1];
+            break;
+          }
         }
       }
       

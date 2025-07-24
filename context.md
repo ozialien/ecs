@@ -524,3 +524,24 @@ Create a cdk deployment tool for deploying ecs environments.
 - **Issue**: Silent error swallowing made debugging difficult
 - **Solution**: Added warning messages for parsing failures
 - **Implementation**: Enhanced `parseEnvironmentVariables()` and `parseSecrets()` with proper error logging
+
+#### 29. Fixed Values File Format Inconsistencies - Testing and Documentation Issue
+- **Fix**: Updated tests and examples to use correct `-c valuesFile=` format instead of non-existent `--values` flag
+- **Issue**: Tests and examples were still using `--values` flag which doesn't exist in the implementation
+- **Problem**: 
+  ```bash
+  # WRONG - Tests and examples were using this
+  cdk deploy --values values.yaml
+  ```
+- **Solution**: Updated all tests and examples to use the correct format:
+  ```bash
+  # RIGHT - Correct format
+  cdk deploy -c valuesFile=values.yaml
+  ```
+- **Files Fixed**:
+  - `test/helm-style-cli.test.ts` - Updated all test cases
+  - `examples/values-dev.yaml` - Updated usage comment
+  - `examples/values-prod.yaml` - Updated usage comment
+- **Lesson**: When changing CLI interfaces, must update ALL related components: tests, examples, documentation
+- **Requirement**: Always test as you go and ensure all components are consistent
+- **Follow-up**: All values file usage now consistently uses `-c valuesFile=` format

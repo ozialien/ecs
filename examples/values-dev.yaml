@@ -1,5 +1,5 @@
 # Development Environment Values
-# Usage: cdk deploy --values examples/values-dev.yaml
+# Usage: cdk deploy -c valuesFile=examples/values-dev.yaml
 
 vpcId: vpc-12345678
 subnetIds: 
