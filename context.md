@@ -932,3 +932,151 @@ Create a cdk deployment tool for deploying ecs environments.
 - **Lesson**: Don't remove working functionality when refactoring. Add new features without breaking existing ones
 - **Requirement**: Master branch functionality must be preserved
 - **Follow-up**: Need to restore missing functionality that examples depend on
+
+## TODO: Missing Features for Full Example YAML Support
+
+### High Priority Features (Required by Most Examples)
+
+#### 1. Runtime Platform Support
+- **Status**: ❌ Not implemented
+- **Required By**: All example YAML files
+- **Implementation Needed**:
+  ```typescript
+  // In TaskDefinition interface
+  runtimePlatform?: {
+    cpuArchitecture: 'X86_64' | 'ARM64';
+    os: 'LINUX' | 'WINDOWS_SERVER_2019_CORE' | 'WINDOWS_SERVER_2019_FULL' | 'WINDOWS_SERVER_2022_CORE' | 'WINDOWS_SERVER_2022_FULL';
+  };
+  ```
+- **CDK Implementation**: Add to `createTaskDefinition()` method
+- **Files to Update**: `lib/ecs-service-stack.ts`, `lib/types.ts`
+
+#### 2. Add-ons Section (Logging & Monitoring)
+- **Status**: ❌ Not implemented
+- **Required By**: All example YAML files
+- **Implementation Needed**:
+  ```yaml
+  addons:
+    logging:
+      driver: "awslogs"
+      options:
+        awslogs-group: "/ecs/my-service"
+        awslogs-region: "us-west-2"
+      retentionDays: 7
+    monitoring:
+      enableXRay: true
+      enableCloudWatchAlarms: true
+  ```
+- **CDK Implementation**: Add `addons` section to `EcsServiceConfig` interface
+- **Files to Update**: `lib/types.ts`, `lib/ecs-service-stack.ts`
+
+#### 3. Advanced IAM Permissions
+- **Status**: ❌ Not implemented
+- **Required By**: `values-matsonlabs.yaml`, `values-structured-test.yaml`
+- **Implementation Needed**:
+  ```yaml
+  iam:
+    taskRole:
+      policies: ["AmazonECS_FullAccess"]
+      custom: |
+        {
+          "Version": "2012-10-17",
+          "Statement": [{ "Effect": "Allow", "Action": "s3:GetObject", "Resource": "*" }]
+        }
+      permissions:
+        secretsManager:
+          actions: ["secretsmanager:GetSecretValue"]
+          resources: ["*"]
+  ```
+- **CDK Implementation**: Enhance `createTaskRole()` and `createExecutionRole()` methods
+- **Files to Update**: `lib/ecs-service-stack.ts`, `lib/types.ts`
+
+### Medium Priority Features
+
+#### 4. Advanced Load Balancer Features
+- **Status**: ❌ Partially implemented
+- **Required By**: `values-matsonlabs.yaml`
+- **Missing Features**:
+  - `loadBalancer.targetGroup.healthCheck.enabled`
+  - `loadBalancer.targetGroup.healthCheck.path`
+  - `loadBalancer.targetGroup.healthCheck.healthyHttpCodes`
+  - `loadBalancer.targetGroup.deregistrationDelay`
+- **CDK Implementation**: Enhance `createLoadBalancedService()` method
+- **Files to Update**: `lib/ecs-service-stack.ts`, `lib/types.ts`
+
+#### 5. Advanced Security Group Features
+- **Status**: ❌ Partially implemented
+- **Required By**: `values-matsonlabs.yaml`
+- **Missing Features**:
+  - `infrastructure.securityGroups[].id` (import existing security groups)
+  - `infrastructure.securityGroups[].rules[].protocol`
+- **CDK Implementation**: Enhance `configureSecurityGroup()` method
+- **Files to Update**: `lib/ecs-service-stack.ts`, `lib/types.ts`
+
+#### 6. Advanced Deployment Features
+- **Status**: ❌ Partially implemented
+- **Required By**: All example YAML files
+- **Missing Features**:
+  - `service.deployment.minimumHealthyPercent`
+  - `service.deployment.maximumPercent`
+- **CDK Implementation**: Enhance service creation with deployment configuration
+- **Files to Update**: `lib/ecs-service-stack.ts`, `lib/types.ts`
+
+### Low Priority Features
+
+#### 7. Legacy Format Completion
+- **Status**: 🔄 Partially implemented
+- **Required By**: `values-legacy-test.yaml`
+- **Missing Features**:
+  - Complete backward compatibility with flat configuration
+  - All legacy parameters supported
+- **CDK Implementation**: Complete legacy parameter support in `loadConfiguration()`
+- **Files to Update**: `lib/ecs-service-stack.ts`, `bin/cdk.ts`
+
+#### 8. Advanced Monitoring Features
+- **Status**: ❌ Not implemented
+- **Required By**: `values-matsonlabs.yaml`
+- **Missing Features**:
+  - X-Ray tracing support
+  - CloudWatch alarms configuration
+  - Custom metrics
+- **CDK Implementation**: Add monitoring section to add-ons
+- **Files to Update**: `lib/ecs-service-stack.ts`, `lib/types.ts`
+
+### Implementation Priority Order
+
+1. **Runtime Platform Support** - Required by all examples
+2. **Add-ons Section** - Logging and monitoring features
+3. **Advanced IAM Permissions** - Detailed policy support
+4. **Advanced Load Balancer Features** - Health check configuration
+5. **Advanced Security Group Features** - Import existing SGs
+6. **Advanced Deployment Features** - Deployment percentages
+7. **Legacy Format Completion** - Full backward compatibility
+8. **Advanced Monitoring** - X-Ray and CloudWatch alarms
+
+### Example Compatibility Status
+
+- **values-dev.yaml**: ✅ **MOSTLY SUPPORTED** (missing runtime platform, add-ons, advanced IAM)
+- **values-prod.yaml**: ✅ **MOSTLY SUPPORTED** (missing runtime platform, add-ons, advanced IAM)
+- **values-structured-test.yaml**: ✅ **MOSTLY SUPPORTED** (missing runtime platform, add-ons, advanced IAM)
+- **values-matsonlabs.yaml**: ❌ **MANY MISSING FEATURES** (requires significant implementation)
+- **values-legacy-test.yaml**: 🔄 **PARTIALLY SUPPORTED** (basic legacy format supported)
+
+### Success Criteria
+
+To fully support all example YAML files, the CDK implementation must:
+
+1. ✅ Support all features used in `values-dev.yaml`, `values-prod.yaml`, and `values-structured-test.yaml`
+2. ✅ Support all features used in `values-matsonlabs.yaml` (most complex example)
+3. ✅ Support all features used in `values-legacy-test.yaml` (legacy format)
+4. ✅ Maintain backward compatibility with existing deployments
+5. ✅ Pass all tests after implementing new features
+
+### Next Steps
+
+1. **Implement Runtime Platform Support** (High Priority)
+2. **Add Add-ons Section** (High Priority)
+3. **Enhance IAM Permissions** (High Priority)
+4. **Test with Example YAML Files** (Validation)
+5. **Update Tests** (Quality Assurance)
+6. **Document New Features** (Documentation)
