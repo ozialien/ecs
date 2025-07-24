@@ -722,7 +722,7 @@ export class EcsServiceStack extends cdk.Stack {
       throw new Error('No main container found in task definition');
     }
     
-    const container = taskDefinition.addContainer(`${stackName}Container`, {
+    const container = taskDefinition.addContainer(mainContainer.name, {
       image: this.createContainerImage(mainContainer.image),
       logging: ecs.LogDrivers.awsLogs({
         logGroup: logGroup,
