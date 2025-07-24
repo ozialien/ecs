@@ -7,7 +7,6 @@ import * as cdk from 'aws-cdk-lib';
 import { EcsServiceConfig } from './types';
 import { 
   StructuredEcsConfig, 
-  LegacyEcsConfig, 
   Infrastructure, 
   Compute, 
   Container, 
@@ -144,132 +143,7 @@ export class ConfigMapper {
     return legacy;
   }
   
-  /**
-   * Convert legacy configuration to structured format
-   * This allows migration from flat to structured format
-   */
-  static legacyToStructured(legacy: EcsServiceConfig): StructuredEcsConfig {
-    const structured: StructuredEcsConfig = {
-      // Metadata
-      metadata: {
-        name: legacy.stackName || 'ecs-service',
-        version: '1.0.0',
-        description: 'ECS Service migrated from legacy format',
-      },
-      
-      // Infrastructure
-      infrastructure: {
-        vpc: {
-          id: legacy.vpcId,
-          subnets: Array.isArray(legacy.subnetIds) ? legacy.subnetIds : legacy.subnetIds?.split(','),
-        },
-        securityGroups: legacy.allowedCidr ? [{
-          name: 'default-sg',
-          rules: [{
-            port: legacy.containerPort || 80,
-            cidr: legacy.allowedCidr,
-            description: 'Default security group rule',
-          }],
-        }] : undefined,
-      },
-      
-      // Compute
-      compute: legacy.cpu || legacy.memory ? {
-        type: 'FARGATE',
-        cpu: legacy.cpu || 256,
-        memory: legacy.memory || 512,
-      } : undefined,
-      
-      // Containers
-      containers: legacy.image ? [{
-        name: 'main',
-        image: legacy.image,
-        portMappings: legacy.containerPort ? [{
-          containerPort: legacy.containerPort,
-          protocol: 'tcp',
-        }] : undefined,
-        environment: legacy.environment ? Object.entries(legacy.environment).map(([name, value]) => ({
-          name,
-          value,
-        })) : undefined,
-        healthCheck: legacy.healthCheck,
-        mountPoints: legacy.additionalContainers?.[0]?.mountPoints,
-      }] : undefined,
-      
-      // Volumes
-      volumes: legacy.volumes,
-      
-      // Service
-      service: {
-        type: 'LOAD_BALANCED',
-        clusterName: legacy.clusterName || '',
-        desiredCount: legacy.desiredCount || 1,
-        loadBalancer: legacy.lbPort || legacy.lbProtocol ? {
-          type: 'APPLICATION',
-          scheme: legacy.publicLoadBalancer === false ? 'internal' : 'internet-facing',
-          protocol: legacy.lbProtocol,
-          port: legacy.lbPort,
-          certificateArn: legacy.certificateArn,
-                  targetGroup: legacy.loadBalancerHealthCheck ? {
-          healthCheckPath: legacy.loadBalancerHealthCheck.path,
-          healthyHttpCodes: legacy.loadBalancerHealthCheck.healthyHttpCodes,
-          interval: legacy.loadBalancerHealthCheck.interval ? 
-            legacy.loadBalancerHealthCheck.interval.toSeconds() : undefined,
-          timeout: legacy.loadBalancerHealthCheck.timeout ? 
-            legacy.loadBalancerHealthCheck.timeout.toSeconds() : undefined,
-          healthyThresholdCount: legacy.loadBalancerHealthCheck.healthyThresholdCount,
-          unhealthyThresholdCount: legacy.loadBalancerHealthCheck.unhealthyThresholdCount,
-        } : undefined,
-        } : undefined,
-        deployment: legacy.deploymentConfiguration ? {
-          minimumHealthyPercent: legacy.deploymentConfiguration.minimumHealthyPercent,
-          maximumPercent: legacy.deploymentConfiguration.maximumPercent,
-          healthCheckGracePeriodSeconds: legacy.healthCheckGracePeriodSeconds,
-        } : undefined,
-      },
-      
-      // IAM
-      iam: {
-        taskRole: legacy.taskRolePermissions ? {
-          policies: this.mapLegacyIamPolicies(legacy.taskRolePermissions),
-        } : undefined,
-        taskExecutionRole: legacy.taskExecutionRolePermissions ? {
-          policies: this.mapLegacyIamPolicies(legacy.taskExecutionRolePermissions),
-        } : undefined,
-      },
-      
-      // Service discovery
-      serviceDiscovery: legacy.serviceDiscovery ? {
-        enabled: legacy.serviceDiscovery.enabled,
-        namespace: legacy.serviceDiscovery.namespace ? {
-          name: legacy.serviceDiscovery.namespace,
-          type: 'private',
-        } : undefined,
-        service: legacy.serviceDiscovery.serviceName ? {
-          name: legacy.serviceDiscovery.serviceName,
-          dnsType: legacy.serviceDiscovery.dnsType || 'A',
-          ttl: legacy.serviceDiscovery.ttl,
-        } : undefined,
-      } : undefined,
-      
-      // Add-ons
-      addons: {
-        logging: legacy.logRetentionDays ? {
-          driver: 'awslogs',
-          retentionDays: legacy.logRetentionDays,
-        } : undefined,
-        autoScaling: legacy.enableAutoScaling ? {
-          enabled: legacy.enableAutoScaling,
-          minCapacity: legacy.minCapacity,
-          maxCapacity: legacy.maxCapacity,
-          targetCpuUtilization: legacy.targetCpuUtilization,
-          targetMemoryUtilization: legacy.targetMemoryUtilization,
-        } : undefined,
-      },
-    };
-    
-    return structured;
-  }
+  
   
   /**
    * Map IAM policies from structured format to legacy format
@@ -287,16 +161,7 @@ export class ConfigMapper {
     return mapped;
   }
   
-  /**
-   * Map IAM policies from legacy format to structured format
-   */
-  private static mapLegacyIamPolicies(permissions: { [key: string]: { actions: string[]; resources: string[] } }): { name: string; actions: string[]; resources: string[] }[] {
-    return Object.entries(permissions).map(([name, policy]) => ({
-      name,
-      actions: policy.actions,
-      resources: policy.resources,
-    }));
-  }
+
   
   /**
    * Detect if configuration is in structured format
@@ -310,19 +175,6 @@ export class ConfigMapper {
       config.iam !== undefined ||
       config.serviceDiscovery !== undefined ||
       config.addons !== undefined
-    );
-  }
-  
-  /**
-   * Detect if configuration is in legacy format
-   */
-  static isLegacyConfig(config: any): config is LegacyEcsConfig {
-    return config && (
-      config.vpcId !== undefined ||
-      config.subnetIds !== undefined ||
-      config.clusterName !== undefined ||
-      config.image !== undefined ||
-      config.stackName !== undefined
     );
   }
 } 

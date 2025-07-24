@@ -120,52 +120,68 @@ AWS_PROFILE=prod cdk deploy \
   --context maxCapacity=10
 ```
 
-### Helm-style Values File Deployment
+### Structured Values File Deployment
 
 Create a `values.yaml` file:
 
 ```yaml
-vpcId: vpc-12345678
-subnetIds: 
-  - subnet-12345678
-  - subnet-87654321
-clusterName: my-cluster
-image: nginx:alpine
-containerPort: 80
-lbPort: 80
-serviceName: myapp-api
-desiredCount: 2
-cpu: 512
-memory: 1024
-enableAutoScaling: true
-minCapacity: 1
-maxCapacity: 5
-environment:
-  NODE_ENV: production
-  API_VERSION: v1
+metadata:
+  name: "myapp-api"
+  version: "1.0.0"
+
+infrastructure:
+  vpc:
+    id: "vpc-12345678"
+    subnets: ["subnet-12345678", "subnet-87654321"]
+
+compute:
+  type: "FARGATE"
+  cpu: 512
+  memory: 1024
+
+containers:
+  - name: "main"
+    image: "nginx:alpine"
+    portMappings:
+      - containerPort: 80
+        protocol: "tcp"
+    environment:
+      - name: "NODE_ENV"
+        value: "production"
+      - name: "API_VERSION"
+        value: "v1"
+
+service:
+  type: "LOAD_BALANCED"
+  clusterName: "my-cluster"
+  desiredCount: 2
+  loadBalancer:
+    type: "APPLICATION"
+    scheme: "internet-facing"
+    protocol: "HTTP"
+    port: 80
+
+addons:
+  autoScaling:
+    enabled: true
+    minCapacity: 1
+    maxCapacity: 5
+    targetCpuUtilization: 70
 ```
 
-Then deploy using Helm-style syntax:
+Then deploy using the structured format:
 
 ```bash
 # Values file only
 AWS_PROFILE=dev cdk deploy -c valuesFile=values.yaml
 
-# Values file with overrides (Helm-style)
+# Values file with overrides
 AWS_PROFILE=dev cdk deploy -c valuesFile=values.yaml -c image=nginx:latest
 ```
 
-### Legacy Context-based Values File
+### Structured Helm-like Configuration
 
-You can also use the legacy context parameter approach:
-
-```bash
-AWS_PROFILE=dev cdk deploy -c valuesFile=values.json
-```
-
-### Structured Helm-like Configuration (New!)
-
-The CDK now supports a structured, Helm-like configuration format that maps directly to ECS/AWS resource hierarchies. This provides better organization and readability:
+The CDK uses a structured, Helm-like configuration format that maps directly to ECS/AWS resource hierarchies. This provides better organization and readability:
 
 ```yaml
 # values-structured.yaml
@@ -250,27 +266,12 @@ AWS_PROFILE=dev cdk deploy \
 
 ## Configuration
 
-### Configuration Format Comparison
+### Configuration Format
 
-The CDK supports two configuration formats:
+The CDK uses a structured, Helm-like configuration format that maps directly to ECS/AWS resource hierarchies:
 
-#### Legacy Flat Format (Backward Compatible)
 ```yaml
-# values-legacy.yaml
-vpcId: vpc-12345678
-subnetIds: subnet-12345678,subnet-87654321
-clusterName: my-cluster
-image: nginx:alpine
-containerPort: 80
-lbPort: 80
-desiredCount: 2
-cpu: 512
-memory: 1024
-```
-
-#### Structured Helm-like Format (New)
-```yaml
-# values-structured.yaml
+# values.yaml
 metadata:
   name: "my-service"
   version: "1.0.0"
@@ -298,7 +299,7 @@ service:
   desiredCount: 2
 ```
 
-**Both formats work seamlessly** - the CDK automatically detects and converts between formats as needed.
+This structured format provides better organization, readability, and maintainability.
 
 ### Required Parameters
 
@@ -569,84 +570,7 @@ taskExecutionRolePermissions:
     resources:
       - arn:aws:ssm:us-west-2:123456789012:parameter/*
 
-## Migration from Legacy to Structured Format
 
-The CDK automatically detects and converts between configuration formats. To migrate from legacy to structured format:
-
-### Automatic Migration
-The CDK will automatically convert your existing flat configuration to structured format when you use the structured format. No manual conversion is required.
-
-### Manual Migration Example
-
-**Legacy Format:**
-```yaml
-# values-legacy.yaml
-vpcId: vpc-12345678
-subnetIds: subnet-12345678,subnet-87654321
-clusterName: my-cluster
-image: nginx:alpine
-containerPort: 80
-lbPort: 80
-desiredCount: 2
-cpu: 512
-memory: 1024
-environment:
-  NODE_ENV: production
-enableAutoScaling: true
-minCapacity: 1
-maxCapacity: 5
-```
-
-**Structured Format:**
-```yaml
-# values-structured.yaml
-metadata:
-  name: "my-service"
-  version: "1.0.0"
-
-infrastructure:
-  vpc:
-    id: "vpc-12345678"
-    subnets: ["subnet-12345678", "subnet-87654321"]
-
-compute:
-  type: "FARGATE"
-  cpu: 512
-  memory: 1024
-
-containers:
-  - name: "main"
-    image: "nginx:alpine"
-    portMappings:
-      - containerPort: 80
-        protocol: "tcp"
-    environment:
-      - name: "NODE_ENV"
-        value: "production"
-
-service:
-  type: "LOAD_BALANCED"
-  clusterName: "my-cluster"
-  desiredCount: 2
-  loadBalancer:
-    type: "APPLICATION"
-    scheme: "internet-facing"
-    protocol: "HTTP"
-    port: 80
-
-addons:
-  autoScaling:
-    enabled: true
-    minCapacity: 1
-    maxCapacity: 5
-    targetCpuUtilization: 70
-```
-
-### Benefits of Migration
-- **Better organization** - Related settings grouped together
-- **Enhanced readability** - Clear hierarchy and structure
-- **Easier maintenance** - Modify specific components without affecting others
-- **Future-proof** - Ready for advanced features and capabilities
 
 ## Help
 

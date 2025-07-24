@@ -204,15 +204,14 @@ export class EcsServiceStack extends cdk.Stack {
     if (config.valuesFile) {
       const values = this.loadValuesFile(config.valuesFile);
       
-      // Check if the loaded values are in structured format
+      // Convert structured configuration to legacy format for compatibility
       if (ConfigMapper.isStructuredConfig(values)) {
-        console.log('📋 Detected structured configuration format, converting to legacy format...');
+        console.log('📋 Converting structured configuration to legacy format...');
         const structuredConfig = values;
         const legacyConfig = ConfigMapper.structuredToLegacy(structuredConfig);
         Object.assign(config, legacyConfig);
       } else {
-        // Legacy format - merge directly
-        Object.assign(config, values);
+        throw new Error('❌ Legacy flat format is no longer supported. Please use the structured Helm-like format.');
       }
     }
 
