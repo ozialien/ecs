@@ -18,6 +18,9 @@ export interface EcsServiceConfig {
   /** Subnet IDs for the ECS service (comma-separated string or array) */
   subnetIds: string | string[];
   
+  /** Availability zones for VPC import (optional) */
+  availabilityZones?: string[];
+  
   /** Security Group IDs for the ECS service (comma-separated string or array) */
   securityGroupIds?: string | string[];
   

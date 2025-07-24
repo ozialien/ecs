@@ -77,6 +77,7 @@ REQUIRED PARAMETERS:
 
 OPTIONAL PARAMETERS:
   serviceName              Service name (defaults to stack name)
+  availabilityZones        Availability zones for VPC import (default: us-west-2a,us-west-2b,us-west-2c)
   desiredCount             Number of tasks to run (default: 1)
   cpu                      CPU units for the task (default: 256)
   memory                   Memory in MiB for the task (default: 512)

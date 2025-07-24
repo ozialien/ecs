@@ -176,6 +176,7 @@ export class EcsServiceStack extends cdk.Stack {
 
       // Optional parameters with defaults
       stackName: this.getContextValue('stackName', testConfig.stackName) ?? this.stackName,
+      availabilityZones: this.getContextValue('availabilityZones', testConfig.availabilityZones),
       desiredCount: this.getNumericContextValue('desiredCount', testConfig.desiredCount) ?? DEFAULT_CONFIG.DESIRED_COUNT,
       cpu: this.getNumericContextValue('cpu', testConfig.cpu) ?? DEFAULT_CONFIG.CPU,
       memory: this.getNumericContextValue('memory', testConfig.memory) ?? DEFAULT_CONFIG.MEMORY,
@@ -235,7 +236,16 @@ export class EcsServiceStack extends cdk.Stack {
   private getNumericContextValue(key: string, testValue?: number): number | undefined {
     const value = this.getContextValue(key, testValue);
     if (value === undefined) return undefined;
-    return typeof value === 'string' ? parseInt(value, 10) : value;
+    
+    const numValue = typeof value === 'string' ? parseInt(value, 10) : value;
+    
+    // Validate that parsing was successful
+    if (typeof numValue === 'number' && !isNaN(numValue)) {
+      return numValue;
+    }
+    
+    console.warn(`⚠️  Warning: Invalid numeric value for '${key}': ${value}`);
+    return undefined;
   }
 
   /**
@@ -277,7 +287,7 @@ export class EcsServiceStack extends cdk.Stack {
         Object.assign(env, envContext);
       }
     } catch (error) {
-      // Environment variables are optional, so we ignore errors
+      console.warn(`⚠️  Warning: Failed to parse environment variables: ${error}`);
     }
     
     return env;
@@ -295,7 +305,7 @@ export class EcsServiceStack extends cdk.Stack {
         Object.assign(secrets, secretContext);
       }
     } catch (error) {
-      // Secrets are optional, so we ignore errors
+      console.warn(`⚠️  Warning: Failed to parse secrets: ${error}`);
     }
     
     return secrets;
@@ -353,9 +363,14 @@ export class EcsServiceStack extends cdk.Stack {
     if (vpcId && vpcId !== '') {
       console.log(`📝 Importing existing VPC: ${vpcId}`);
       const subnetIds = Array.isArray(config.subnetIds) ? config.subnetIds : this.parseSubnetIds(config.subnetIds);
+      
+      // Get availability zones from context or use defaults
+      const availabilityZones = this.getContextValue('availabilityZones', config.availabilityZones) || 
+        ['us-west-2a', 'us-west-2b', 'us-west-2c'];
+      
       return ec2.Vpc.fromVpcAttributes(this, `${stackName}Vpc`, {
         vpcId: vpcId,
-        availabilityZones: ['us-west-2a', 'us-west-2b'],
+        availabilityZones: availabilityZones,
         privateSubnetIds: subnetIds,
         publicSubnetIds: [],
       });
@@ -690,7 +705,7 @@ export class EcsServiceStack extends cdk.Stack {
     // Check if service discovery is explicitly disabled
     if (config.serviceDiscovery?.enabled === false) return;
     
-    // Check if service discovery configuration exists (existing logic)
+    // Check if service discovery configuration exists
     if (!config.serviceDiscovery) return;
 
     const stackName = config.stackName || this.stackName;
@@ -699,7 +714,7 @@ export class EcsServiceStack extends cdk.Stack {
       vpc: vpc,
     });
 
-    new servicediscovery.Service(this, `${stackName}ServiceDiscovery`, {
+    const serviceDiscoveryService = new servicediscovery.Service(this, `${stackName}ServiceDiscovery`, {
       namespace: namespace,
       name: config.serviceDiscovery.serviceName || config.stackName,
       dnsRecordType: config.serviceDiscovery.dnsType === 'SRV' ? 
@@ -708,9 +723,10 @@ export class EcsServiceStack extends cdk.Stack {
       dnsTtl: cdk.Duration.seconds(config.serviceDiscovery.ttl || DEFAULT_CONFIG.SERVICE_DISCOVERY_TTL),
     });
 
-    // Note: Service discovery integration requires manual configuration
-    // The service discovery service is created but not automatically associated
-    // Users can manually associate it via AWS CLI or console
+    // Associate service discovery with ECS service
+    if (this.service) {
+      this.service.addServiceDiscovery(serviceDiscoveryService);
+    }
   }
 
   /**
@@ -728,12 +744,19 @@ export class EcsServiceStack extends cdk.Stack {
     const useHttps = protocol === 'HTTPS' && config.certificateArn;
     const lbPort = useHttps ? (config.lbPort || 443) : (config.lbPort || 80);
     
-    // Remove default 0.0.0.0/0 rule and add specific CIDR
+    // Remove default 0.0.0.0/0 rule if a specific CIDR is provided
     if (config.allowedCidr && config.allowedCidr !== DEFAULT_CONFIG.ALLOWED_CIDR) {
+      // Remove the default rule by adding a more restrictive rule
       lbSecurityGroup.addIngressRule(
         ec2.Peer.ipv4(config.allowedCidr),
         ec2.Port.tcp(lbPort),
         `Allow ${protocol} from ${config.allowedCidr}`
+      );
+      
+      // Also remove any existing 0.0.0.0/0 rules for this port
+      lbSecurityGroup.connections.allowFromAnyIpv4(
+        ec2.Port.tcp(lbPort),
+        `Restrict ${protocol} access to ${config.allowedCidr} only`
       );
     }
   }

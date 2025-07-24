@@ -489,3 +489,38 @@ Create a cdk deployment tool for deploying ecs environments.
 - **Lesson**: CDK has established conventions. Follow them exactly. Don't try to be clever with directory structure
 - **Requirement**: All future changes must maintain this exact structure
 - **Follow-up**: Project now follows CDK standard structure correctly
+
+#### 24. Fixed VPC Availability Zones - Configuration Issue
+- **Fix**: Made VPC availability zones configurable instead of hardcoded
+- **Issue**: VPC import was using hardcoded `['us-west-2a', 'us-west-2b']` which doesn't work for other regions
+- **Solution**: Added `availabilityZones` context parameter with fallback to `['us-west-2a', 'us-west-2b', 'us-west-2c']`
+- **Implementation**: 
+  ```typescript
+  const availabilityZones = this.getContextValue('availabilityZones', config.availabilityZones) || 
+    ['us-west-2a', 'us-west-2b', 'us-west-2c'];
+  ```
+- **Usage**: `--context availabilityZones=us-east-1a,us-east-1b,us-east-1c`
+
+#### 25. Fixed Security Group Configuration - Network Security Issue
+- **Fix**: Improved security group rule management for load balancer
+- **Issue**: Security group logic only added rules but didn't properly handle default 0.0.0.0/0 rule
+- **Solution**: Added proper rule management that removes default rules when specific CIDR is provided
+- **Implementation**: Enhanced `configureSecurityGroup()` method with better rule handling
+
+#### 26. Fixed Numeric Value Parsing - Type Safety Issue
+- **Fix**: Added proper validation for numeric context values
+- **Issue**: `parseInt()` could return `NaN` without validation
+- **Solution**: Added validation to ensure numeric values are valid before returning
+- **Implementation**: Enhanced `getNumericContextValue()` with NaN checking and warning messages
+
+#### 27. Fixed Service Discovery Integration - Feature Completion Issue
+- **Fix**: Actually integrated service discovery with ECS service
+- **Issue**: Service discovery was created but never associated with the ECS service
+- **Solution**: Added `this.service.addServiceDiscovery(serviceDiscoveryService)` to associate them
+- **Implementation**: Modified `configureServiceDiscovery()` to properly link service discovery with ECS service
+
+#### 28. Improved Error Handling - Debugging Issue
+- **Fix**: Added proper error logging for environment variables and secrets parsing
+- **Issue**: Silent error swallowing made debugging difficult
+- **Solution**: Added warning messages for parsing failures
+- **Implementation**: Enhanced `parseEnvironmentVariables()` and `parseSecrets()` with proper error logging

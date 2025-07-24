@@ -193,6 +193,7 @@ CONTEXT PARAMETERS:
   --context subnetIds=<subnet-ids>
   --context clusterName=<cluster-name>
   --context image=<image-uri>
+  --context availabilityZones=<az1,az2,az3>
   --context containerPort=<port>
   --context lbPort=<port>
   --context serviceName=<service-name>
