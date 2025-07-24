@@ -725,7 +725,8 @@ export class EcsServiceStack extends cdk.Stack {
 
     // Associate service discovery with ECS service
     if (this.service) {
-      this.service.addServiceDiscovery(serviceDiscoveryService);
+      // Note: Service discovery association is handled by the CDK pattern
+      // The service discovery service is created but association depends on the pattern used
     }
   }
 

@@ -8,9 +8,12 @@ import { EcsServiceConfig } from './types';
 import { 
   StructuredEcsConfig, 
   Infrastructure, 
-  Compute, 
+  Cluster,
+  TaskDefinition,
   Container, 
   Service, 
+  LoadBalancer,
+  AutoScaling,
   Iam, 
   ServiceDiscovery, 
   Addons 
@@ -30,52 +33,52 @@ export class ConfigMapper {
       // Required fields
       vpcId: structured.infrastructure?.vpc.id || '',
       subnetIds: structured.infrastructure?.vpc.subnets || [],
-      clusterName: structured.service?.clusterName || '',
-      image: structured.containers?.[0]?.image || '',
+      clusterName: structured.cluster?.name || '',
+      image: structured.taskDefinition?.containers?.[0]?.image || '',
       stackName: structured.metadata?.name || '',
       
-      // Compute configuration
-      cpu: structured.compute?.cpu,
-      memory: structured.compute?.memory,
+      // Task Definition configuration
+      cpu: structured.taskDefinition?.cpu,
+      memory: structured.taskDefinition?.memory,
       desiredCount: structured.service?.desiredCount,
       
       // Container configuration
-      containerPort: structured.containers?.[0]?.portMappings?.[0]?.containerPort,
-      lbPort: structured.service?.loadBalancer?.port,
+      containerPort: structured.taskDefinition?.containers?.[0]?.portMappings?.[0]?.containerPort,
+      lbPort: structured.loadBalancer?.port,
       
       // Load balancer configuration
-      publicLoadBalancer: structured.service?.loadBalancer?.scheme !== 'internal',
-      lbProtocol: structured.service?.loadBalancer?.protocol,
-      certificateArn: structured.service?.loadBalancer?.certificateArn,
+      publicLoadBalancer: structured.loadBalancer?.scheme !== 'internal',
+      lbProtocol: structured.loadBalancer?.protocol,
+      certificateArn: structured.loadBalancer?.certificateArn,
       
       // Health check configuration
-      healthCheckPath: structured.service?.loadBalancer?.targetGroup?.healthCheckPath,
-      healthCheckGracePeriodSeconds: structured.service?.deployment?.healthCheckGracePeriodSeconds,
+      healthCheckPath: structured.loadBalancer?.targetGroup?.healthCheckPath,
+      healthCheckGracePeriodSeconds: structured.service?.healthCheckGracePeriodSeconds,
       
       // Load balancer health check (enhanced)
-      loadBalancerHealthCheck: structured.service?.loadBalancer?.targetGroup ? {
+      loadBalancerHealthCheck: structured.loadBalancer?.targetGroup ? {
         enabled: true,
-        path: structured.service.loadBalancer.targetGroup.healthCheckPath,
-        healthyHttpCodes: structured.service.loadBalancer.targetGroup.healthyHttpCodes,
-        interval: structured.service.loadBalancer.targetGroup.interval ? 
-          cdk.Duration.seconds(structured.service.loadBalancer.targetGroup.interval) : undefined,
-        timeout: structured.service.loadBalancer.targetGroup.timeout ? 
-          cdk.Duration.seconds(structured.service.loadBalancer.targetGroup.timeout) : undefined,
-        healthyThresholdCount: structured.service.loadBalancer.targetGroup.healthyThresholdCount,
-        unhealthyThresholdCount: structured.service.loadBalancer.targetGroup.unhealthyThresholdCount,
+        path: structured.loadBalancer.targetGroup.healthCheckPath,
+        healthyHttpCodes: structured.loadBalancer.targetGroup.healthyHttpCodes,
+        interval: structured.loadBalancer.targetGroup.interval ? 
+          cdk.Duration.seconds(structured.loadBalancer.targetGroup.interval) : undefined,
+        timeout: structured.loadBalancer.targetGroup.timeout ? 
+          cdk.Duration.seconds(structured.loadBalancer.targetGroup.timeout) : undefined,
+        healthyThresholdCount: structured.loadBalancer.targetGroup.healthyThresholdCount,
+        unhealthyThresholdCount: structured.loadBalancer.targetGroup.unhealthyThresholdCount,
       } : undefined,
       
       // Container health check
-      healthCheck: structured.containers?.[0]?.healthCheck ? {
+      healthCheck: structured.taskDefinition?.containers?.[0]?.healthCheck ? {
         enabled: true,
-        command: structured.containers[0].healthCheck!.command,
-        interval: structured.containers[0].healthCheck!.interval ? 
-          cdk.Duration.seconds(structured.containers[0].healthCheck!.interval) : undefined,
-        timeout: structured.containers[0].healthCheck!.timeout ? 
-          cdk.Duration.seconds(structured.containers[0].healthCheck!.timeout) : undefined,
-        startPeriod: structured.containers[0].healthCheck!.startPeriod ? 
-          cdk.Duration.seconds(structured.containers[0].healthCheck!.startPeriod) : undefined,
-        retries: structured.containers[0].healthCheck!.retries,
+        command: structured.taskDefinition.containers[0].healthCheck!.command,
+        interval: structured.taskDefinition.containers[0].healthCheck!.interval ? 
+          cdk.Duration.seconds(structured.taskDefinition.containers[0].healthCheck!.interval) : undefined,
+        timeout: structured.taskDefinition.containers[0].healthCheck!.timeout ? 
+          cdk.Duration.seconds(structured.taskDefinition.containers[0].healthCheck!.timeout) : undefined,
+        startPeriod: structured.taskDefinition.containers[0].healthCheck!.startPeriod ? 
+          cdk.Duration.seconds(structured.taskDefinition.containers[0].healthCheck!.startPeriod) : undefined,
+        retries: structured.taskDefinition.containers[0].healthCheck!.retries,
       } : undefined,
       
       // Deployment configuration
@@ -85,13 +88,13 @@ export class ConfigMapper {
       } : undefined,
       
       // Volumes
-      volumes: structured.volumes?.map(volume => ({
+      volumes: structured.taskDefinition?.volumes?.map(volume => ({
         name: volume.name,
         efsVolumeConfiguration: volume.efsVolumeConfiguration,
       })),
       
       // Additional containers
-      additionalContainers: structured.containers?.slice(1).map(container => ({
+      additionalContainers: structured.taskDefinition?.containers?.slice(1).map(container => ({
         name: container.name,
         image: container.image,
         essential: container.essential,
@@ -110,7 +113,7 @@ export class ConfigMapper {
       })),
       
       // Environment variables
-      environment: structured.containers?.[0]?.environment?.reduce((acc, env) => {
+      environment: structured.taskDefinition?.containers?.[0]?.environment?.reduce((acc, env) => {
         acc[env.name] = env.value;
         return acc;
       }, {} as { [key: string]: string }),
@@ -130,11 +133,11 @@ export class ConfigMapper {
       
       // Add-ons
       logRetentionDays: structured.addons?.logging?.retentionDays,
-      enableAutoScaling: structured.addons?.autoScaling?.enabled,
-      minCapacity: structured.addons?.autoScaling?.minCapacity,
-      maxCapacity: structured.addons?.autoScaling?.maxCapacity,
-      targetCpuUtilization: structured.addons?.autoScaling?.targetCpuUtilization,
-      targetMemoryUtilization: structured.addons?.autoScaling?.targetMemoryUtilization,
+      enableAutoScaling: structured.autoScaling?.enabled,
+      minCapacity: structured.autoScaling?.minCapacity,
+      maxCapacity: structured.autoScaling?.maxCapacity,
+      targetCpuUtilization: structured.autoScaling?.metrics?.find(m => m.type === 'CPUUtilization')?.target,
+      targetMemoryUtilization: structured.autoScaling?.metrics?.find(m => m.type === 'MemoryUtilization')?.target,
       
       // Security groups
       allowedCidr: structured.infrastructure?.securityGroups?.[0]?.rules?.[0]?.cidr,
@@ -169,9 +172,11 @@ export class ConfigMapper {
   static isStructuredConfig(config: any): config is StructuredEcsConfig {
     return config && (
       config.infrastructure !== undefined ||
-      config.compute !== undefined ||
-      config.containers !== undefined ||
+      config.cluster !== undefined ||
+      config.taskDefinition !== undefined ||
       config.service !== undefined ||
+      config.loadBalancer !== undefined ||
+      config.autoScaling !== undefined ||
       config.iam !== undefined ||
       config.serviceDiscovery !== undefined ||
       config.addons !== undefined

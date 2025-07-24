@@ -20,53 +20,65 @@ infrastructure:
         - port: 443
           cidr: "10.0.0.0/16"
 
-# --- Compute (Fargate/EC2) ---
-compute:
+# --- ECS Cluster ---
+cluster:
+  name: "my-cluster"
+  containerInsights: true
+
+# --- Task Definition ---
+taskDefinition:
   type: "FARGATE"  # or "EC2"
   cpu: 1024        # 0.25 vCPU to 4 vCPU (Fargate increments)
   memory: 2048     # MB (must match Fargate combinations)
   runtimePlatform:  # Optional (ARM/x86)
     cpuArchitecture: "X86_64"
     os: "LINUX"
+  containers:
+    - name: "app"
+      image: "public.ecr.aws/nginx:latest"
+      portMappings:
+        - containerPort: 80
+          hostPort: 80
+          protocol: "tcp"
+      environment:
+        - name: "ENV"
+          value: "prod"
+      secrets:  # SSM or Secrets Manager
+        - name: "DB_PASSWORD"
+          valueFrom: "arn:aws:ssm:us-east-1:123456789:parameter/db_password"
+      healthCheck:
+        command: ["CMD-SHELL", "curl -f http://localhost/health || exit 1"]
+        interval: 30
+        timeout: 5
 
-# --- Container Definition ---
-containers:
-  - name: "app"
-    image: "public.ecr.aws/nginx:latest"
-    portMappings:
-      - containerPort: 80
-        hostPort: 80
-        protocol: "tcp"
-    environment:
-      - name: "ENV"
-        value: "prod"
-    secrets:  # SSM or Secrets Manager
-      - name: "DB_PASSWORD"
-        valueFrom: "arn:aws:ssm:us-east-1:123456789:parameter/db_password"
-    healthCheck:
-      command: ["CMD-SHELL", "curl -f http://localhost/health || exit 1"]
-      interval: 30
-      timeout: 5
-
-# --- Service Configuration ---
+# --- ECS Service ---
 service:
   type: "LOAD_BALANCED"  # or "DAEMON", "SCHEDULED"
-  loadBalancer:
-    type: "APPLICATION"  # or "NETWORK"
-    targetGroup:
-      healthCheckPath: "/health"
-      stickiness: true
-  scaling:
-    min: 2
-    max: 10
-    metrics:
-      - type: "CPUUtilization"
-        target: 70
-      - type: "MemoryUtilization"
-        target: 60
+  desiredCount: 2
   deployment:
     strategy: "ROLLING"  # or "BLUE_GREEN", "CANARY"
     waitForSteadyState: true
+
+# --- Load Balancer ---
+loadBalancer:
+  type: "APPLICATION"  # or "NETWORK"
+  scheme: "internet-facing"
+  protocol: "HTTP"
+  port: 80
+  targetGroup:
+    healthCheckPath: "/health"
+    stickiness: true
+
+# --- Auto Scaling ---
+autoScaling:
+  enabled: true
+  minCapacity: 2
+  maxCapacity: 10
+  metrics:
+    - type: "CPUUtilization"
+      target: 70
+    - type: "MemoryUtilization"
+      target: 60
 
 # --- IAM (Permissions) ---
 iam:

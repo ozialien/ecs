@@ -116,15 +116,6 @@ autoScaling:
     - type: "MemoryUtilization"
       target: 70
 
-# --- IAM Roles ---
-iam:
-  taskRole:
-    policies:
-      - "AmazonECS_FullAccess"
-  taskExecutionRole:
-    policies:
-      - "AmazonECSTaskExecutionRolePolicy"
-
 # --- Service Discovery ---
 serviceDiscovery:
   namespace: "caserd.local"
@@ -143,10 +134,6 @@ addons:
   monitoring:
     enableXRay: false
     enableCloudWatchAlarms: true
-  namespace: caserd.local
-  serviceName: cas-erd-svc
-  dnsType: A
-  ttl: 60
 
 # --- IAM Roles ---
 iam:

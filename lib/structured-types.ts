@@ -51,9 +51,17 @@ export interface Infrastructure {
 }
 
 /**
- * Compute configuration
+ * ECS Cluster configuration
  */
-export interface Compute {
+export interface Cluster {
+  name: string;
+  containerInsights?: boolean;
+}
+
+/**
+ * Task Definition configuration
+ */
+export interface TaskDefinition {
   type: 'FARGATE' | 'EC2';
   cpu: number;
   memory: number;
@@ -61,6 +69,8 @@ export interface Compute {
     cpuArchitecture: 'X86_64' | 'ARM64';
     os: 'LINUX' | 'WINDOWS_SERVER_2019_CORE' | 'WINDOWS_SERVER_2019_FULL' | 'WINDOWS_SERVER_2022_CORE' | 'WINDOWS_SERVER_2022_FULL';
   };
+  containers: Container[];
+  volumes?: Volume[];
 }
 
 /**
@@ -191,10 +201,9 @@ export interface NetworkConfiguration {
  */
 export interface Service {
   type: 'LOAD_BALANCED' | 'DAEMON' | 'SCHEDULED';
-  clusterName: string;
   desiredCount: number;
-  loadBalancer?: LoadBalancer;
   deployment?: Deployment;
+  healthCheckGracePeriodSeconds?: number;
   networkConfiguration?: NetworkConfiguration;
 }
 
@@ -290,14 +299,21 @@ export interface CrossAccount {
 }
 
 /**
+ * Auto scaling metric
+ */
+export interface AutoScalingMetric {
+  type: 'CPUUtilization' | 'MemoryUtilization';
+  target: number;
+}
+
+/**
  * Auto scaling configuration
  */
 export interface AutoScaling {
   enabled?: boolean;
   minCapacity?: number;
   maxCapacity?: number;
-  targetCpuUtilization?: number;
-  targetMemoryUtilization?: number;
+  metrics?: AutoScalingMetric[];
 }
 
 /**
@@ -327,10 +343,11 @@ export interface Addons {
 export interface StructuredEcsConfig {
   metadata?: Metadata;
   infrastructure?: Infrastructure;
-  compute?: Compute;
-  containers?: Container[];
-  volumes?: Volume[];
+  cluster?: Cluster;
+  taskDefinition?: TaskDefinition;
   service?: Service;
+  loadBalancer?: LoadBalancer;
+  autoScaling?: AutoScaling;
   iam?: Iam;
   serviceDiscovery?: ServiceDiscovery;
   addons?: Addons;
