@@ -1,0 +1,192 @@
+# values-casscheduleradmin.yaml for CASSchedulerAdmin deployment
+# Usage: cdk deploy -c valuesFile=examples/values-casscheduleradmin.yaml
+# Corresponds to cf/CASSchedulerAdmin.yaml CloudFormation template
+
+# --- Metadata ---
+metadata:
+  name: "casscheduler-admin"
+  version: "3.2.8-snapshot"
+  description: "CASSchedulerAdmin Service - MatsonLabs Environment"
+
+# --- Infrastructure ---
+infrastructure:
+  vpc:
+    id: "vpc-42de9927"
+    subnets: ["subnet-c56802b2", "subnet-103d3874"]
+  securityGroups:
+    - name: "casscheduler-lb-sg"
+      rules:
+        - port: 443
+          cidr: "10.0.0.0/8"
+        - port: 9090
+          cidr: "10.0.0.0/8"
+    - name: "casscheduler-app-sg"
+      rules:
+        - port: 8080
+          sourceSecurityGroup: "casscheduler-lb-sg"
+        - port: 9090
+          sourceSecurityGroup: "casscheduler-lb-sg"
+
+# --- ECS Cluster ---
+cluster:
+  name: "casscheduler-cluster"
+  containerInsights: true
+
+# --- Task Definition ---
+taskDefinition:
+  type: "FARGATE"
+  cpu: 2048
+  memory: 4096
+  runtimePlatform:
+    cpuArchitecture: "X86_64"
+    os: "LINUX"
+  containers:
+    - name: "casscheduler"
+      image: "275416279984.dkr.ecr.us-west-2.amazonaws.com/cas-snapshots/cas-scheduler-admin:3.2.8-snapshot"
+      portMappings:
+        - containerPort: 8080
+          protocol: "tcp"
+      environment:
+        - name: "ALLOW_EMPTY_PASSWORD"
+          value: "yes"
+      mountPoints:
+        - sourceVolume: "tmp"
+          containerPath: "/tmp"
+          readOnly: false
+        - sourceVolume: "var-lib-amazon"
+          containerPath: "/var/lib/amazon"
+          readOnly: false
+        - sourceVolume: "var-log-amazon"
+          containerPath: "/var/log/amazon"
+          readOnly: false
+        - sourceVolume: "var-cache-fontconfig"
+          containerPath: "/var/cache/fontconfig"
+          readOnly: false
+      healthCheck:
+        command: ["CMD-SHELL", "curl -f https://localhost:8080/CASSchedulerAdmin/info || exit 1"]
+        interval: 30
+        timeout: 5
+    - name: "permission-container"
+      image: "busybox:latest"
+      essential: false
+      readonlyRootFilesystem: true
+      entryPoint: ["sh", "-c"]
+      command: ["chmod 0777 /tmp"]
+      mountPoints:
+        - sourceVolume: "tmp"
+          containerPath: "/tmp"
+          readOnly: false
+        - sourceVolume: "var-lib-amazon"
+          containerPath: "/var/lib/amazon"
+          readOnly: false
+        - sourceVolume: "var-log-amazon"
+          containerPath: "/var/log/amazon"
+          readOnly: false
+  volumes:
+    - name: "var-lib-amazon"
+    - name: "var-log-amazon"
+    - name: "tmp"
+    - name: "var-cache-fontconfig"
+
+# --- ECS Service ---
+service:
+  type: "LOAD_BALANCED"
+  desiredCount: 1
+  deployment:
+    strategy: "ROLLING"
+    waitForSteadyState: true
+    minimumHealthyPercent: 100
+    maximumPercent: 200
+  healthCheckGracePeriodSeconds: 600
+  networkConfiguration:
+    assignPublicIp: "DISABLED"
+
+# --- Load Balancer ---
+loadBalancer:
+  type: "APPLICATION"
+  scheme: "internal"
+  protocol: "HTTPS"
+  port: 443
+  certificateArn: "arn:aws:acm:us-west-2:275416279984:certificate/87de9dbf-75e1-4fef-badf-834846d72d02"
+  targetGroup:
+    healthCheckPath: "/CASSchedulerAdmin/info"
+    port: 8080
+    protocol: "HTTP"
+    deregistrationDelay: 300
+
+# --- Auto Scaling ---
+autoScaling:
+  enabled: false
+  minCapacity: 1
+  maxCapacity: 3
+  metrics:
+    - type: "CPUUtilization"
+      target: 70
+    - type: "MemoryUtilization"
+      target: 70
+
+# --- IAM Roles ---
+iam:
+  taskRole:
+    policies:
+      - "AmazonECS_FullAccess"
+    permissions:
+      ec2:
+        actions:
+          - ec2:DescribeInstances
+          - ec2:StartInstances
+          - ec2:StopInstances
+        resources:
+          - "*"
+      ssm:
+        actions:
+          - ssmmessages:CreateControlChannel
+          - ssmmessages:CreateDataChannel
+          - ssmmessages:OpenControlChannel
+          - ssmmessages:OpenDataChannel
+        resources:
+          - "*"
+      ecs:
+        actions:
+          - ecs:ListTagsForResource
+          - ecs:RegisterTaskDefinition
+          - ecs:ListClusters
+          - ecs:DescribeContainerInstances
+          - ecs:ListTaskDefinitions
+          - ecs:DescribeTaskDefinition
+          - ecs:DeregisterTaskDefinition
+          - ecs:ListContainerInstances
+          - ecs:RunTask
+          - ecs:StopTask
+          - ecs:DescribeTasks
+        resources:
+          - "*"
+      iam:
+        actions:
+          - iam:GetRole
+          - iam:PassRole
+        resources:
+          - "arn:aws:iam::275416279984:role/casscheduler-execution-role"
+  taskExecutionRole:
+    policies:
+      - "AmazonECSTaskExecutionRolePolicy"
+
+# --- Service Discovery ---
+serviceDiscovery:
+  namespace: "casscheduler-admin"
+  serviceName: "casscheduler"
+  dnsType: "A"
+  ttl: 60
+
+# --- Add-ons ---
+addons:
+  logging:
+    driver: "awslogs"
+    options:
+      awslogs-group: "/ecs/casscheduler-admin"
+      awslogs-region: "us-west-2"
+      awslogs-stream-prefix: "casscheduler"
+    retentionDays: 14
+  monitoring:
+    enableXRay: false
+    enableCloudWatchAlarms: true 
