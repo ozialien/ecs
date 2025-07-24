@@ -297,8 +297,8 @@ describe('EcsServiceStack', () => {
               protocol: 'tcp'
             }],
             secrets: [
-              { name: 'DB_PASSWORD', valueFrom: 'arn:aws:secretsmanager:us-west-2:123456789012:secret:db-password:password::' },
-              { name: 'API_KEY', valueFrom: 'arn:aws:secretsmanager:us-west-2:123456789012:secret:api-key:key::' }
+              { name: 'DB_PASSWORD', valueFrom: 'arn:aws:secretsmanager:us-west-2:123456789012:secret:db-password:password:123456' },
+              { name: 'API_KEY', valueFrom: 'arn:aws:secretsmanager:us-west-2:123456789012:secret:api-key:key:123456' }
             ]
           }]
         },
@@ -320,8 +320,8 @@ describe('EcsServiceStack', () => {
       ContainerDefinitions: [
         {
           Secrets: [
-            { Name: 'DB_PASSWORD', ValueFrom: 'arn:aws:secretsmanager:us-west-2:123456789012:secret:db-password:password::' },
-            { Name: 'API_KEY', ValueFrom: 'arn:aws:secretsmanager:us-west-2:123456789012:secret:api-key:key::' }
+            { Name: 'DB_PASSWORD', ValueFrom: 'arn:aws:secretsmanager:us-west-2:123456789012:secret:db-password:password:123456' },
+            { Name: 'API_KEY', ValueFrom: 'arn:aws:secretsmanager:us-west-2:123456789012:secret:api-key:key:123456' }
           ]
         }
       ]
