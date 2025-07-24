@@ -431,7 +431,7 @@ export class EcsServiceStack extends cdk.Stack {
       const subnetIds = config.infrastructure?.vpc?.subnets || [];
       
       // Get availability zones from context or use defaults
-      const availabilityZones = this.getContextValue('availabilityZones') || 
+      const availabilityZones = this.getContextValue('availabilityZones') as string[] || 
         ['us-west-2a', 'us-west-2b', 'us-west-2c'];
       
       // Ensure availability zones match the number of subnets
@@ -583,7 +583,7 @@ export class EcsServiceStack extends cdk.Stack {
     taskDefinition: ecs.FargateTaskDefinition, 
     logGroup: logs.LogGroup
   ): ecs.ContainerDefinition {
-    const stackName = config.metadata?.name || config.stackName || this.stackName;
+    const stackName = config.metadata?.name || this.stackName;
     const mainContainer = config.taskDefinition?.containers?.[0];
     
     if (!mainContainer) {
@@ -802,7 +802,7 @@ export class EcsServiceStack extends cdk.Stack {
       vpc: vpc,
     });
 
-    const serviceName = config.serviceDiscovery.service?.name || config.stackName;
+    const serviceName = config.serviceDiscovery.service?.name || stackName;
     const dnsType = config.serviceDiscovery.service?.dnsType || 'A';
     const ttl = config.serviceDiscovery.service?.ttl || DEFAULT_CONFIG.SERVICE_DISCOVERY_TTL;
 
@@ -833,23 +833,23 @@ export class EcsServiceStack extends cdk.Stack {
     const lbSecurityGroup = service.loadBalancer.connections.securityGroups[0];
     
     // Determine protocol and port for security group
-    const protocol = config.lbProtocol || 'HTTP';
-    const useHttps = protocol === 'HTTPS' && config.certificateArn;
-    const lbPort = useHttps ? (config.lbPort || 443) : (config.lbPort || 80);
+    const protocol = config.loadBalancer.protocol || 'HTTP';
+    const useHttps = protocol === 'HTTPS' && config.loadBalancer.certificateArn;
+    const lbPort = useHttps ? (config.loadBalancer.port || 443) : (config.loadBalancer.port || 80);
     
     // Remove default 0.0.0.0/0 rule if a specific CIDR is provided
-    if (config.allowedCidr && config.allowedCidr !== DEFAULT_CONFIG.ALLOWED_CIDR) {
+    if (config.loadBalancer.allowedCidr && config.loadBalancer.allowedCidr !== DEFAULT_CONFIG.ALLOWED_CIDR) {
       // Remove the default rule by adding a more restrictive rule
       lbSecurityGroup.addIngressRule(
-        ec2.Peer.ipv4(config.allowedCidr),
+        ec2.Peer.ipv4(config.loadBalancer.allowedCidr),
         ec2.Port.tcp(lbPort),
-        `Allow ${protocol} from ${config.allowedCidr}`
+        `Allow ${protocol} from ${config.loadBalancer.allowedCidr}`
       );
       
       // Also remove any existing 0.0.0.0/0 rules for this port
       lbSecurityGroup.connections.allowFromAnyIpv4(
         ec2.Port.tcp(lbPort),
-        `Restrict ${protocol} access to ${config.allowedCidr} only`
+        `Restrict ${protocol} access to ${config.loadBalancer.allowedCidr} only`
       );
     }
   }
