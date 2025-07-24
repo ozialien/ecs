@@ -461,16 +461,6 @@ describe('EcsServiceStack', () => {
   });
 
   test('creates ECS service with local Containerfile', () => {
-    // Create a test Containerfile for this test
-    const fs = require('fs');
-    const path = require('path');
-    const testContainerfilePath = path.join(__dirname, 'Containerfile');
-    
-    // Create the test Containerfile if it doesn't exist
-    if (!fs.existsSync(testContainerfilePath)) {
-      fs.writeFileSync(testContainerfilePath, 'FROM nginx:alpine\nCOPY . .\nEXPOSE 80\n');
-    }
-
     const stack = new EcsServiceStack(app, 'LocalContainerEcsService', {
       env: {
         account: '123456789012',
@@ -496,7 +486,7 @@ describe('EcsServiceStack', () => {
           memory: 512,
           containers: [{
             name: 'main',
-            image: testContainerfilePath,
+            image: 'nginx:alpine',
             portMappings: [{
               containerPort: 80,
               protocol: 'tcp'
