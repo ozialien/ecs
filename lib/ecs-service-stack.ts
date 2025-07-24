@@ -840,8 +840,8 @@ export class EcsServiceStack extends cdk.Stack {
     // Check if health check is explicitly disabled
     if (healthCheck?.enabled === false) return undefined;
     
-    // Check if health check has required configuration (existing logic)
-    if (!healthCheck?.command) return undefined;
+    // Check if health check has required configuration
+    if (!healthCheck?.command || healthCheck.command.length === 0) return undefined;
 
     return {
       command: healthCheck.command,

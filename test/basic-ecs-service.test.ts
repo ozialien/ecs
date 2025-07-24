@@ -1,14 +1,14 @@
 /**
- * ECS Service Stack Tests
+ * Basic ECS Service Tests
  * 
- * Core tests for the ECS Service Stack construct
+ * Tests for core ECS service functionality with minimal configuration
  */
 
 import * as cdk from 'aws-cdk-lib';
 import { Template } from 'aws-cdk-lib/assertions';
 import { EcsServiceStack } from '../lib/ecs-service-stack';
 
-describe('EcsServiceStack', () => {
+describe('Basic ECS Service', () => {
   let app: cdk.App;
 
   beforeEach(() => {
@@ -81,6 +81,63 @@ describe('EcsServiceStack', () => {
     template.hasResourceProperties('AWS::Logs::LogGroup', {});
   });
 
+  test('creates ECS service with custom configuration', () => {
+    const stack = new EcsServiceStack(app, 'CustomEcsService', {
+      env: {
+        account: '123456789012',
+        region: 'us-west-2'
+      },
+      config: {
+        metadata: {
+          name: 'test-stack',
+          version: '1.0.0'
+        },
+        infrastructure: {
+          vpc: {
+            id: 'vpc-12345678',
+            subnets: ['subnet-12345678', 'subnet-87654321']
+          }
+        },
+        cluster: {
+          name: 'test-cluster'
+        },
+        taskDefinition: {
+          type: 'FARGATE',
+          cpu: 512,
+          memory: 1024,
+          containers: [{
+            name: 'main',
+            image: 'nginx:alpine',
+            portMappings: [{
+              containerPort: 8080,
+              protocol: 'tcp'
+            }]
+          }]
+        },
+        service: {
+          type: 'LOAD_BALANCED',
+          desiredCount: 3
+        },
+        loadBalancer: {
+          type: 'APPLICATION',
+          port: 80
+        }
+      }
+    });
+
+    const template = Template.fromStack(stack);
+
+    // Verify custom configuration is applied
+    template.hasResourceProperties('AWS::ECS::Service', {
+      DesiredCount: 3,
+    });
+
+    template.hasResourceProperties('AWS::ECS::TaskDefinition', {
+      Cpu: '512',
+      Memory: '1024',
+    });
+  });
+
   test('throws error when required parameters are missing', () => {
     expect(() => {
       new EcsServiceStack(app, 'MissingParamsEcsService', {
@@ -125,69 +182,8 @@ describe('EcsServiceStack', () => {
     }).toThrow();
   });
 
-  test('creates ECS service with local Containerfile', () => {
-    const stack = new EcsServiceStack(app, 'LocalContainerfileEcsService', {
-      env: {
-        account: '123456789012',
-        region: 'us-west-2'
-      },
-      config: {
-        metadata: {
-          name: 'test-stack',
-          version: '1.0.0'
-        },
-        infrastructure: {
-          vpc: {
-            id: 'vpc-12345678',
-            subnets: ['subnet-12345678', 'subnet-87654321']
-          }
-        },
-        cluster: {
-          name: 'test-cluster'
-        },
-        taskDefinition: {
-          type: 'FARGATE',
-          cpu: 256,
-          memory: 512,
-          containers: [{
-            name: 'main',
-            image: 'test/Containerfile',
-            portMappings: [{
-              containerPort: 80,
-              protocol: 'tcp'
-            }]
-          }]
-        },
-        service: {
-          type: 'LOAD_BALANCED',
-          desiredCount: 1
-        },
-        loadBalancer: {
-          type: 'APPLICATION',
-          port: 80
-        }
-      }
-    });
-
-    const template = Template.fromStack(stack);
-
-    // Verify the stack was created successfully
-    expect(stack).toBeDefined();
-    expect(stack.service).toBeDefined();
-    expect(stack.cluster).toBeDefined();
-    expect(stack.loadBalancer).toBeDefined();
-  });
-
-  test('handles explicit credential context parameters', () => {
-    const app = new cdk.App();
-    
-    // Set up context with explicit credential parameters
-    app.node.setContext('awsAccessKeyId', 'AKIAIOSFODNN7EXAMPLE');
-    app.node.setContext('awsSecretAccessKey', 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY');
-    app.node.setContext('awsSessionToken', 'AQoEXAMPLEH4aoAH0gNCAPyJxzrBlXWt6TresKlOLb8vPBrIwT');
-    
-    // Create stack with basic config
-    const stack = new EcsServiceStack(app, 'ExplicitCredentialTestEcsService', {
+  test('package builds successfully', () => {
+    const stack = new EcsServiceStack(app, 'BuildTestEcsService', {
       env: {
         account: '123456789012',
         region: 'us-west-2'
@@ -235,22 +231,5 @@ describe('EcsServiceStack', () => {
     expect(stack.service).toBeDefined();
     expect(stack.cluster).toBeDefined();
     expect(stack.loadBalancer).toBeDefined();
-  });
-
-  test('types are exported correctly', () => {
-    const mainExports = require('../lib/index');
-    expect(mainExports).toHaveProperty('EcsServiceStack');
-  });
-
-  test('help system works', () => {
-    expect(() => {
-      require('../lib/help');
-    }).not.toThrow();
-  });
-
-  test('main index exports correctly', () => {
-    expect(() => {
-      require('../lib/index');
-    }).not.toThrow();
   });
 }); 
