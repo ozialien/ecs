@@ -3,6 +3,7 @@
  * Maintains backward compatibility while supporting new Helm-like structure
  */
 
+import * as cdk from 'aws-cdk-lib';
 import { EcsServiceConfig } from './types';
 import { 
   StructuredEcsConfig, 
@@ -57,8 +58,10 @@ export class ConfigMapper {
         enabled: true,
         path: structured.service.loadBalancer.targetGroup.healthCheckPath,
         healthyHttpCodes: structured.service.loadBalancer.targetGroup.healthyHttpCodes,
-        interval: structured.service.loadBalancer.targetGroup.interval,
-        timeout: structured.service.loadBalancer.targetGroup.timeout,
+        interval: structured.service.loadBalancer.targetGroup.interval ? 
+          cdk.Duration.seconds(structured.service.loadBalancer.targetGroup.interval) : undefined,
+        timeout: structured.service.loadBalancer.targetGroup.timeout ? 
+          cdk.Duration.seconds(structured.service.loadBalancer.targetGroup.timeout) : undefined,
         healthyThresholdCount: structured.service.loadBalancer.targetGroup.healthyThresholdCount,
         unhealthyThresholdCount: structured.service.loadBalancer.targetGroup.unhealthyThresholdCount,
       } : undefined,
@@ -67,9 +70,12 @@ export class ConfigMapper {
       healthCheck: structured.containers?.[0]?.healthCheck ? {
         enabled: true,
         command: structured.containers[0].healthCheck!.command,
-        interval: structured.containers[0].healthCheck!.interval,
-        timeout: structured.containers[0].healthCheck!.timeout,
-        startPeriod: structured.containers[0].healthCheck!.startPeriod,
+        interval: structured.containers[0].healthCheck!.interval ? 
+          cdk.Duration.seconds(structured.containers[0].healthCheck!.interval) : undefined,
+        timeout: structured.containers[0].healthCheck!.timeout ? 
+          cdk.Duration.seconds(structured.containers[0].healthCheck!.timeout) : undefined,
+        startPeriod: structured.containers[0].healthCheck!.startPeriod ? 
+          cdk.Duration.seconds(structured.containers[0].healthCheck!.startPeriod) : undefined,
         retries: structured.containers[0].healthCheck!.retries,
       } : undefined,
       
@@ -204,14 +210,16 @@ export class ConfigMapper {
           protocol: legacy.lbProtocol,
           port: legacy.lbPort,
           certificateArn: legacy.certificateArn,
-          targetGroup: legacy.loadBalancerHealthCheck ? {
-            healthCheckPath: legacy.loadBalancerHealthCheck.path,
-            healthyHttpCodes: legacy.loadBalancerHealthCheck.healthyHttpCodes,
-            interval: legacy.loadBalancerHealthCheck.interval,
-            timeout: legacy.loadBalancerHealthCheck.timeout,
-            healthyThresholdCount: legacy.loadBalancerHealthCheck.healthyThresholdCount,
-            unhealthyThresholdCount: legacy.loadBalancerHealthCheck.unhealthyThresholdCount,
-          } : undefined,
+                  targetGroup: legacy.loadBalancerHealthCheck ? {
+          healthCheckPath: legacy.loadBalancerHealthCheck.path,
+          healthyHttpCodes: legacy.loadBalancerHealthCheck.healthyHttpCodes,
+          interval: legacy.loadBalancerHealthCheck.interval ? 
+            legacy.loadBalancerHealthCheck.interval.toSeconds() : undefined,
+          timeout: legacy.loadBalancerHealthCheck.timeout ? 
+            legacy.loadBalancerHealthCheck.timeout.toSeconds() : undefined,
+          healthyThresholdCount: legacy.loadBalancerHealthCheck.healthyThresholdCount,
+          unhealthyThresholdCount: legacy.loadBalancerHealthCheck.unhealthyThresholdCount,
+        } : undefined,
         } : undefined,
         deployment: legacy.deploymentConfiguration ? {
           minimumHealthyPercent: legacy.deploymentConfiguration.minimumHealthyPercent,

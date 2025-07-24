@@ -163,6 +163,79 @@ You can also use the legacy context parameter approach:
 AWS_PROFILE=dev cdk deploy -c valuesFile=values.json
 ```
 
+### Structured Helm-like Configuration (New!)
+
+The CDK now supports a structured, Helm-like configuration format that maps directly to ECS/AWS resource hierarchies. This provides better organization and readability:
+
+```yaml
+# values-structured.yaml
+metadata:
+  name: "my-service"
+  version: "1.0.0"
+  description: "Example ECS Service"
+
+infrastructure:
+  vpc:
+    id: "vpc-12345678"
+    subnets: ["subnet-12345678", "subnet-87654321"]
+
+compute:
+  type: "FARGATE"
+  cpu: 512
+  memory: 1024
+
+containers:
+  - name: "main"
+    image: "nginx:alpine"
+    portMappings:
+      - containerPort: 80
+        protocol: "tcp"
+    environment:
+      - name: "NODE_ENV"
+        value: "production"
+
+service:
+  type: "LOAD_BALANCED"
+  clusterName: "my-cluster"
+  desiredCount: 2
+  loadBalancer:
+    type: "APPLICATION"
+    scheme: "internet-facing"
+    protocol: "HTTP"
+    port: 80
+    targetGroup:
+      healthCheckPath: "/"
+      interval: 30
+      timeout: 5
+
+addons:
+  logging:
+    driver: "awslogs"
+    retentionDays: 7
+  autoScaling:
+    enabled: true
+    minCapacity: 1
+    maxCapacity: 5
+    targetCpuUtilization: 70
+```
+
+Deploy with structured configuration:
+
+```bash
+# Structured format
+AWS_PROFILE=dev cdk deploy -c valuesFile=values-structured.yaml
+
+# Structured format with overrides
+AWS_PROFILE=dev cdk deploy -c valuesFile=values-structured.yaml -c image=nginx:latest
+```
+
+**Benefits of Structured Format:**
+- **Helm-like organization** - Familiar to Kubernetes users
+- **ECS hierarchy mapping** - Direct correlation to AWS resources
+- **Better readability** - Clear separation of concerns
+- **Enhanced maintainability** - Easy to modify specific components
+- **Backward compatibility** - Existing flat format still works
+
 ### Using Local Containerfile
 
 ```bash
@@ -176,6 +249,56 @@ AWS_PROFILE=dev cdk deploy \
 ```
 
 ## Configuration
+
+### Configuration Format Comparison
+
+The CDK supports two configuration formats:
+
+#### Legacy Flat Format (Backward Compatible)
+```yaml
+# values-legacy.yaml
+vpcId: vpc-12345678
+subnetIds: subnet-12345678,subnet-87654321
+clusterName: my-cluster
+image: nginx:alpine
+containerPort: 80
+lbPort: 80
+desiredCount: 2
+cpu: 512
+memory: 1024
+```
+
+#### Structured Helm-like Format (New)
+```yaml
+# values-structured.yaml
+metadata:
+  name: "my-service"
+  version: "1.0.0"
+
+infrastructure:
+  vpc:
+    id: "vpc-12345678"
+    subnets: ["subnet-12345678", "subnet-87654321"]
+
+compute:
+  type: "FARGATE"
+  cpu: 512
+  memory: 1024
+
+containers:
+  - name: "main"
+    image: "nginx:alpine"
+    portMappings:
+      - containerPort: 80
+        protocol: "tcp"
+
+service:
+  type: "LOAD_BALANCED"
+  clusterName: "my-cluster"
+  desiredCount: 2
+```
+
+**Both formats work seamlessly** - the CDK automatically detects and converts between formats as needed.
 
 ### Required Parameters
 
@@ -212,6 +335,115 @@ AWS_PROFILE=dev cdk deploy \
 | `taskRolePermissions` | - | IAM permissions for task role |
 | `taskExecutionRolePermissions` | - | IAM permissions for task execution role |
 | `valuesFile` | - | Values file path |
+
+### Structured Configuration Sections
+
+When using the structured format, configuration is organized into logical sections:
+
+#### Metadata Section
+```yaml
+metadata:
+  name: "my-service"
+  version: "1.0.0"
+  description: "Example ECS Service"
+```
+
+#### Infrastructure Section
+```yaml
+infrastructure:
+  vpc:
+    id: "vpc-12345678"
+    subnets: ["subnet-12345678", "subnet-87654321"]
+  securityGroups:
+    - name: "app-sg"
+      rules:
+        - port: 80
+          cidr: "0.0.0.0/0"
+```
+
+#### Compute Section
+```yaml
+compute:
+  type: "FARGATE"
+  cpu: 512
+  memory: 1024
+  runtimePlatform:
+    cpuArchitecture: "X86_64"
+    os: "LINUX"
+```
+
+#### Containers Section
+```yaml
+containers:
+  - name: "main"
+    image: "nginx:alpine"
+    portMappings:
+      - containerPort: 80
+        protocol: "tcp"
+    environment:
+      - name: "NODE_ENV"
+        value: "production"
+    healthCheck:
+      command: ["CMD-SHELL", "curl -f http://localhost/ || exit 1"]
+      interval: 30
+      timeout: 5
+```
+
+#### Service Section
+```yaml
+service:
+  type: "LOAD_BALANCED"
+  clusterName: "my-cluster"
+  desiredCount: 2
+  loadBalancer:
+    type: "APPLICATION"
+    scheme: "internet-facing"
+    protocol: "HTTP"
+    port: 80
+    targetGroup:
+      healthCheckPath: "/"
+      interval: 30
+      timeout: 5
+  deployment:
+    strategy: "ROLLING"
+    minimumHealthyPercent: 100
+    maximumPercent: 200
+```
+
+#### IAM Section
+```yaml
+iam:
+  taskRole:
+    policies:
+      - name: "s3-access"
+        actions:
+          - "s3:GetObject"
+          - "s3:PutObject"
+        resources: ["arn:aws:s3:::my-bucket/*"]
+  taskExecutionRole:
+    policies:
+      - name: "ecr-access"
+        actions:
+          - "ecr:GetAuthorizationToken"
+          - "ecr:BatchGetImage"
+        resources: ["*"]
+```
+
+#### Add-ons Section
+```yaml
+addons:
+  logging:
+    driver: "awslogs"
+    retentionDays: 7
+  monitoring:
+    enableCloudWatchAlarms: true
+    enableXRay: false
+  autoScaling:
+    enabled: true
+    minCapacity: 1
+    maxCapacity: 5
+    targetCpuUtilization: 70
+```
 
 ### Environment Variables
 
@@ -336,6 +568,85 @@ taskExecutionRolePermissions:
       - ssm:GetParametersByPath
     resources:
       - arn:aws:ssm:us-west-2:123456789012:parameter/*
+
+## Migration from Legacy to Structured Format
+
+The CDK automatically detects and converts between configuration formats. To migrate from legacy to structured format:
+
+### Automatic Migration
+The CDK will automatically convert your existing flat configuration to structured format when you use the structured format. No manual conversion is required.
+
+### Manual Migration Example
+
+**Legacy Format:**
+```yaml
+# values-legacy.yaml
+vpcId: vpc-12345678
+subnetIds: subnet-12345678,subnet-87654321
+clusterName: my-cluster
+image: nginx:alpine
+containerPort: 80
+lbPort: 80
+desiredCount: 2
+cpu: 512
+memory: 1024
+environment:
+  NODE_ENV: production
+enableAutoScaling: true
+minCapacity: 1
+maxCapacity: 5
+```
+
+**Structured Format:**
+```yaml
+# values-structured.yaml
+metadata:
+  name: "my-service"
+  version: "1.0.0"
+
+infrastructure:
+  vpc:
+    id: "vpc-12345678"
+    subnets: ["subnet-12345678", "subnet-87654321"]
+
+compute:
+  type: "FARGATE"
+  cpu: 512
+  memory: 1024
+
+containers:
+  - name: "main"
+    image: "nginx:alpine"
+    portMappings:
+      - containerPort: 80
+        protocol: "tcp"
+    environment:
+      - name: "NODE_ENV"
+        value: "production"
+
+service:
+  type: "LOAD_BALANCED"
+  clusterName: "my-cluster"
+  desiredCount: 2
+  loadBalancer:
+    type: "APPLICATION"
+    scheme: "internet-facing"
+    protocol: "HTTP"
+    port: 80
+
+addons:
+  autoScaling:
+    enabled: true
+    minCapacity: 1
+    maxCapacity: 5
+    targetCpuUtilization: 70
+```
+
+### Benefits of Migration
+- **Better organization** - Related settings grouped together
+- **Enhanced readability** - Clear hierarchy and structure
+- **Easier maintenance** - Modify specific components without affecting others
+- **Future-proof** - Ready for advanced features and capabilities
 
 ## Help
 

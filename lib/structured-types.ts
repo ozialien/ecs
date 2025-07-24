@@ -92,7 +92,7 @@ export interface Secret {
  * Container health check
  */
 export interface ContainerHealthCheck {
-  command: string[];
+  command?: string[];
   interval?: number;
   timeout?: number;
   startPeriod?: number;
