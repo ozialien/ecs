@@ -1,0 +1,52 @@
+# values-structured-test.yaml - Simple structured format test
+# This tests the new Helm-like structured configuration
+
+# --- Metadata ---
+metadata:
+  name: "test-structured-service"
+  version: "1.0.0"
+  description: "Test service using structured configuration"
+
+# --- Infrastructure ---
+infrastructure:
+  vpc:
+    id: "vpc-42de9927"
+    subnets: ["subnet-c56802b2", "subnet-103d3874"]
+
+# --- Compute ---
+compute:
+  type: "FARGATE"
+  cpu: 256
+  memory: 512
+
+# --- Containers ---
+containers:
+  - name: "main"
+    image: "nginx:alpine"
+    portMappings:
+      - containerPort: 80
+        protocol: "tcp"
+    environment:
+      - name: "NODE_ENV"
+        value: "test"
+
+# --- Service ---
+service:
+  type: "LOAD_BALANCED"
+  clusterName: "test-structured-cluster"
+  desiredCount: 1
+  loadBalancer:
+    type: "APPLICATION"
+    scheme: "internet-facing"
+    protocol: "HTTP"
+    port: 80
+    targetGroup:
+      healthCheckPath: "/"
+      interval: 30
+      timeout: 5
+
+# --- Add-ons ---
+addons:
+  logging:
+    driver: "awslogs"
+    retentionDays: 7 
