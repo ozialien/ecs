@@ -1,49 +1,25 @@
 {
-  "name": "@matson/ecs",
+  "name": "ecs-deployer",
   "version": "1.0.0",
-  "description": "Helm-style ECS deployment utility for AWS CDK",
-  "main": "dist/lib/index.js",
-  "types": "dist/lib/index.d.ts",
-  "bin": {
-    "matson-ecs": "dist/lib/cli.js"
-  },
-  "cdk": {
-    "app": "npx ts-node --prefer-ts-exts bin/cdk.ts"
-  },
+  "description": "CDK-based ECS deployment tool using CloudFormation templates",
+  "main": "bin/cdk.js",
   "scripts": {
     "build": "tsc",
-    "test": "jest",
-    "clean": "rm -rf dist",
-    "synth": "cdk synth",
-    "deploy": "cdk deploy",
-    "diff": "cdk diff"
-  },
-  "keywords": [
-    "aws",
-    "cdk",
-    "ecs",
-    "deployment",
-    "helm",
-    "infrastructure",
-    "docker",
-    "container"
-  ],
-  "author": "Matson",
-  "license": "MIT",
-  "dependencies": {
-    "aws-cdk-lib": "^2.0.0",
-    "constructs": "^10.0.0",
-    "js-yaml": "^4.1.0"
+    "watch": "tsc -w",
+    "transform": "aws cloudformation create-change-set --template-file cf/ecs-deployment-template.yaml --stack-name test-stack --parameter-overrides $(node bin/yaml-to-params.js values/simple-values.yaml) --capabilities CAPABILITY_IAM --change-set-name transform-output && aws cloudformation describe-change-set --stack-name test-stack --change-set-name transform-output --query 'TemplateBody' --output text > output/deployable.yaml",
+    "transform:example": "aws cloudformation create-change-set --template-file cf/ecs-deployment-template.yaml --stack-name casscheduler-stack --parameter-overrides $(node bin/yaml-to-params.js values/casscheduler-values.yaml) --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM --change-set-name transform-output && aws cloudformation describe-change-set --stack-name casscheduler-stack --change-set-name transform-output --query 'TemplateBody' --output text > output/casscheduler-deployable.yaml",
+    "validate": "aws cloudformation validate-template --template-body file://output/deployable.yaml",
+    "validate:example": "aws cloudformation validate-template --template-body file://output/casscheduler-deployable.yaml"
   },
   "devDependencies": {
-    "@types/jest": "^29.0.0",
-    "@types/node": "^18.0.0",
-    "jest": "^29.0.0",
-    "ts-jest": "^29.0.0",
-    "typescript": "^4.9.0",
-    "ts-node": "^10.9.0"
+    "@types/node": "20.0.0",
+    "ts-node": "^10.9.0",
+    "typescript": "~5.0.0"
   },
-  "peerDependencies": {
-    "aws-cdk-lib": "^2.0.0"
+  "dependencies": {
+    "js-yaml": "^4.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

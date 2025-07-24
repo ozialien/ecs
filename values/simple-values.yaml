@@ -1,0 +1,6 @@
+VpcId: "vpc-12345678"
+SubnetIds: ["subnet-abcdef12", "subnet-34567890"]
+ClusterName: "my-test-cluster"
+ContainerImage: "nginx:alpine"
+ContainerPort: 8080
+ServiceName: "my-test-service" 

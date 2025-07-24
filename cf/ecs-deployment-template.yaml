@@ -1,0 +1,685 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Reusable ECS Fargate Service Deployment Template with Application Load Balancer"
+
+Parameters:
+  # ============================================================================
+  # REQUIRED PARAMETERS
+  # ============================================================================
+  
+  # VPC and Network Configuration
+  VpcId:
+    Type: String
+    Description: "VPC ID where the ECS service will be deployed"
+    AllowedPattern: '^vpc-[a-z0-9]+$'
+    ConstraintDescription: "VPC ID must start with 'vpc-'"
+  
+  SubnetIds:
+    Type: CommaDelimitedList
+    Description: "Subnet IDs for ECS service deployment (minimum 2 for high availability)"
+    ConstraintDescription: "Must provide at least 2 subnet IDs"
+  
+  # ECS Configuration
+  ClusterName:
+    Type: String
+    Default: "ecs-cluster"
+    Description: "Name of the ECS cluster"
+    AllowedPattern: '^[a-zA-Z0-9-_]+$'
+  
+  # Container Configuration
+  ContainerImage:
+    Type: String
+    Description: "Container image URI (e.g., nginx:alpine, 123456789012.dkr.ecr.us-west-2.amazonaws.com/myapp:latest)"
+    AllowedPattern: '^.+$'
+  
+  ContainerPort:
+    Type: Number
+    Default: 80
+    Description: "Port that the container exposes"
+    MinValue: 1
+    MaxValue: 65535
+  
+  LoadBalancerPort:
+    Type: Number
+    Default: 80
+    Description: "Port for the load balancer listener"
+    MinValue: 1
+    MaxValue: 65535
+  
+  # ============================================================================
+  # OPTIONAL PARAMETERS
+  # ============================================================================
+  
+  # Service Configuration
+  ServiceName:
+    Type: String
+    Default: "ecs-service"
+    Description: "Name of the ECS service"
+    AllowedPattern: '^[a-zA-Z0-9-_]+$'
+  
+  DesiredCount:
+    Type: Number
+    Default: 1
+    Description: "Number of tasks to run"
+    MinValue: 1
+    MaxValue: 10
+  
+  # Resource Configuration
+  CpuUnits:
+    Type: Number
+    Default: 256
+    Description: "CPU units for the task (256 = 0.25 vCPU, 1024 = 1 vCPU)"
+    AllowedValues: [256, 512, 1024, 2048, 4096]
+  
+  MemoryMiB:
+    Type: Number
+    Default: 512
+    Description: "Memory in MiB for the task"
+    AllowedValues: [512, 1024, 2048, 4096, 8192, 16384, 30720]
+  
+  # Load Balancer Configuration
+  LoadBalancerScheme:
+    Type: String
+    Default: "internet-facing"
+    AllowedValues: ["internet-facing", "internal"]
+    Description: "Load balancer scheme (internet-facing or internal)"
+  
+  HealthCheckPath:
+    Type: String
+    Default: "/"
+    Description: "Health check path for the target group"
+  
+  HealthCheckGracePeriodSeconds:
+    Type: Number
+    Default: 60
+    Description: "Health check grace period in seconds"
+    MinValue: 0
+    MaxValue: 1800
+  
+  # Security Configuration
+  AllowedCidr:
+    Type: String
+    Default: "0.0.0.0/0"
+    Description: "CIDR block allowed to access the load balancer"
+    AllowedPattern: '^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}$'
+  
+  # ============================================================================
+  # ADVANCED OPTIONAL PARAMETERS (COMMENTED OUT)
+  # ============================================================================
+  
+  # HTTPS/SSL Configuration
+  # CertificateArn:
+  #   Type: String
+  #   Description: "ARN of SSL certificate for HTTPS listener"
+  #   AllowedPattern: '^arn:aws:acm:[a-z0-9-]+:[0-9]{12}:certificate/[a-z0-9-]+$'
+  
+  # Auto Scaling Configuration
+  # EnableAutoScaling:
+  #   Type: String
+  #   Default: "false"
+  #   AllowedValues: ["true", "false"]
+  #   Description: "Enable auto scaling for the service"
+  
+  # MinCapacity:
+  #   Type: Number
+  #   Default: 1
+  #   Description: "Minimum capacity for auto scaling"
+  #   MinValue: 1
+  #   MaxValue: 10
+  
+  # MaxCapacity:
+  #   Type: Number
+  #   Default: 3
+  #   Description: "Maximum capacity for auto scaling"
+  #   MinValue: 1
+  #   MaxValue: 10
+  
+  # TargetCpuUtilization:
+  #   Type: Number
+  #   Default: 70
+  #   Description: "Target CPU utilization percentage for auto scaling"
+  #   MinValue: 1
+  #   MaxValue: 100
+  
+  # EFS Configuration
+  # EnableEFS:
+  #   Type: String
+  #   Default: "false"
+  #   AllowedValues: ["true", "false"]
+  #   Description: "Enable EFS volume for persistent storage"
+  
+  # FileSystemId:
+  #   Type: String
+  #   Description: "EFS file system ID"
+  #   AllowedPattern: '^fs-[a-z0-9]+$'
+  
+  # AccessPointId:
+  #   Type: String
+  #   Description: "EFS access point ID"
+  #   AllowedPattern: '^fsap-[a-z0-9]+$'
+  
+  # Service Discovery Configuration
+  # EnableServiceDiscovery:
+  #   Type: String
+  #   Default: "false"
+  #   AllowedValues: ["true", "false"]
+  #   Description: "Enable AWS Cloud Map service discovery"
+  
+  # ServiceDiscoveryNamespace:
+  #   Type: String
+  #   Default: "local"
+  #   Description: "Service discovery namespace"
+  
+  # Cross-Account Access (for multi-account deployments)
+  # CrossAccountRoleArn:
+  #   Type: String
+  #   Description: "ARN of cross-account role for accessing resources in other accounts"
+  #   AllowedPattern: '^arn:aws:iam::[0-9]{12}:role/[a-zA-Z0-9-_]+$'
+  
+  # Environment Variables
+  # EnvironmentVariables:
+  #   Type: CommaDelimitedList
+  #   Default: ""
+  #   Description: "Environment variables for the container (format: KEY1=VALUE1,KEY2=VALUE2)"
+  
+  # Secrets Configuration
+  # SecretsManagerArn:
+  #   Type: String
+  #   Description: "ARN of Secrets Manager secret for sensitive data"
+  #   AllowedPattern: '^arn:aws:secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:[a-zA-Z0-9-_]+$'
+
+Resources:
+  # ============================================================================
+  # LOAD BALANCER
+  # ============================================================================
+  
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      IpAddressType: ipv4
+      Scheme: !If 
+        - IsInternal
+        - internal
+        - internet-facing
+      Subnets: !Ref SubnetIds
+      SecurityGroups:
+        - !Ref LoadBalancerSecurityGroup
+      # Optional: Enable access logs
+      # LoadBalancerAttributes:
+      #   - Key: access_logs.s3.enabled
+      #     Value: "true"
+      #   - Key: access_logs.s3.bucket
+      #     Value: "my-lb-access-logs"
+      #   - Key: access_logs.s3.prefix
+      #     Value: "alb-logs"
+  
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub "${ServiceName}-lb-sg"
+      GroupDescription: "Security group for load balancer"
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: !Ref LoadBalancerPort
+          ToPort: !Ref LoadBalancerPort
+          CidrIp: !Ref AllowedCidr
+        # Optional: Enable HTTP redirect to HTTPS
+        # - IpProtocol: tcp
+        #   FromPort: 80
+        #   ToPort: 80
+        #   CidrIp: !Ref AllowedCidr
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: !Ref ContainerPort
+          ToPort: !Ref ContainerPort
+          DestinationSecurityGroupId: !Ref ECSContainerSecurityGroup
+  
+  # ============================================================================
+  # LOAD BALANCER LISTENER
+  # ============================================================================
+  
+  LoadBalancerListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      # Optional: HTTPS with SSL certificate
+      # Certificates:
+      #   - CertificateArn: !Ref CertificateArn
+      # Port: 443
+      # Protocol: HTTPS
+      # Default: HTTP
+      Port: !Ref LoadBalancerPort
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          ForwardConfig:
+            TargetGroups:
+              - TargetGroupArn: !Ref TargetGroup
+      LoadBalancerArn: !Ref LoadBalancer
+  
+  # ============================================================================
+  # TARGET GROUP
+  # ============================================================================
+  
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckPath: !Ref HealthCheckPath
+      Name: !Sub "${ServiceName}-tg"
+      Port: !Ref ContainerPort
+      Protocol: HTTP
+      TargetType: ip
+      VpcId: !Ref VpcId
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: "300"
+        - Key: stickiness.enabled
+          Value: "false"
+        # Optional: Enable sticky sessions
+        # - Key: stickiness.enabled
+        #   Value: "true"
+        # - Key: stickiness.lb_cookie.duration_seconds
+        #   Value: "86400"
+  
+  # ============================================================================
+  # ECS CLUSTER
+  # ============================================================================
+  
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Ref ClusterName
+      # Optional: Enable container insights
+      # ClusterSettings:
+      #   - Name: containerInsights
+      #     Value: "enabled"
+      # Optional: Enable CloudWatch Container Insights
+      # CapacityProviders:
+      #   - FARGATE
+      #   - FARGATE_SPOT
+      # DefaultCapacityProviderStrategy:
+      #   - CapacityProvider: FARGATE
+      #     Weight: 1
+  
+  # ============================================================================
+  # IAM ROLES
+  # ============================================================================
+  
+  TaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ServiceName}-execution-role"
+      Path: "/"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      # Optional: Add custom permissions for ECR, Secrets Manager, etc.
+      # Policies:
+      #   - PolicyName: CustomPermissions
+      #     PolicyDocument:
+      #       Version: "2012-10-17"
+      #       Statement:
+      #         - Effect: Allow
+      #           Action:
+      #             - secretsmanager:GetSecretValue
+      #             - kms:Decrypt
+      #           Resource: "*"
+  
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ServiceName}-task-role"
+      Path: "/"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+      # Optional: Add application-specific permissions
+      # Policies:
+      #   - PolicyName: ApplicationPermissions
+      #     PolicyDocument:
+      #       Version: "2012-10-17"
+      #       Statement:
+      #         - Effect: Allow
+      #           Action:
+      #             - s3:GetObject
+      #             - s3:PutObject
+      #           Resource: "arn:aws:s3:::my-app-bucket/*"
+      #         - Effect: Allow
+      #           Action:
+      #             - sqs:SendMessage
+      #             - sqs:ReceiveMessage
+      #           Resource: "arn:aws:sqs:*:*:my-app-queue"
+  
+  # ============================================================================
+  # ECS TASK DEFINITION
+  # ============================================================================
+  
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${ServiceName}-task"
+      Cpu: !Ref CpuUnits
+      Memory: !Ref MemoryMiB
+      NetworkMode: awsvpc
+      TaskRoleArn: !Ref TaskRole
+      ExecutionRoleArn: !Ref TaskExecutionRole
+      RequiresCompatibilities:
+        - FARGATE
+      ContainerDefinitions:
+        - Name: !Ref ServiceName
+          Image: !Ref ContainerImage
+          # Optional: Environment variables
+          # Environment:
+          #   - Name: NODE_ENV
+          #     Value: "production"
+          #   - Name: API_VERSION
+          #     Value: "v1"
+          # Optional: Secrets from Secrets Manager
+          # Secrets:
+          #   - Name: DB_PASSWORD
+          #     ValueFrom: !Ref SecretsManagerArn
+          PortMappings:
+            - ContainerPort: !Ref ContainerPort
+              Protocol: tcp
+          # Optional: EFS volume mounts
+          # MountPoints:
+          #   - SourceVolume: "efs-volume"
+          #     ContainerPath: "/data"
+          #     ReadOnly: false
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref CloudWatchLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: !Ref ServiceName
+          # Optional: Health check configuration
+          # HealthCheck:
+          #   Command:
+          #     - CMD-SHELL
+          #     - curl -f http://localhost:!Ref ContainerPort/ || exit 1
+          #   Interval: 30
+          #   Timeout: 5
+          #   Retries: 3
+          #   StartPeriod: 60
+          # Optional: Resource limits
+          # Cpu: 256
+          # Memory: 512
+          # Optional: Read-only root filesystem for security
+          # ReadonlyRootFilesystem: true
+          # Optional: User and group
+          # User: "1000:1000"
+          # Optional: Working directory
+          # WorkingDirectory: "/app"
+          # Optional: Entry point and command
+          # EntryPoint:
+          #   - "/bin/sh"
+          #   - "-c"
+          # Command:
+          #   - "npm start"
+      # Optional: EFS volumes
+      # Volumes:
+      #   - Name: "efs-volume"
+      #     EFSVolumeConfiguration:
+      #       FileSystemId: !Ref FileSystemId
+      #       TransitEncryption: ENABLED
+      #       AuthorizationConfig:
+      #         AccessPointId: !Ref AccessPointId
+      #         IAM: ENABLED
+  
+  # ============================================================================
+  # CLOUDWATCH LOGS
+  # ============================================================================
+  
+  CloudWatchLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/ecs/${ServiceName}"
+      RetentionInDays: 14
+      # Optional: Set removal policy
+      # DeletionPolicy: Delete
+  
+  # ============================================================================
+  # ECS SERVICE
+  # ============================================================================
+  
+  ECSService:
+    Type: AWS::ECS::Service
+    DependsOn: LoadBalancerListener
+    Properties:
+      Cluster: !Ref ECSCluster
+      TaskDefinition: !Ref TaskDefinition
+      DesiredCount: !Ref DesiredCount
+      HealthCheckGracePeriodSeconds: !Ref HealthCheckGracePeriodSeconds
+      LaunchType: FARGATE
+      PlatformVersion: LATEST
+      ServiceName: !Ref ServiceName
+      # Optional: Deployment configuration
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 100
+        MaximumPercent: 200
+        # Optional: Deployment circuit breaker
+        # DeploymentCircuitBreaker:
+        #   Enable: true
+        #   Rollback: true
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          Subnets: !Ref SubnetIds
+          SecurityGroups:
+            - !GetAtt ECSContainerSecurityGroup.GroupId
+      LoadBalancers:
+        - ContainerName: !Ref ServiceName
+          ContainerPort: !Ref ContainerPort
+          TargetGroupArn: !Ref TargetGroup
+      # Optional: Service discovery
+      # ServiceRegistries:
+      #   - RegistryArn: !GetAtt ServiceDiscoveryService.Arn
+      # Optional: Auto scaling
+      # EnableServiceConnect: true
+      # ServiceConnectConfiguration:
+      #   Enabled: true
+      #   LogConfiguration:
+      #     LogDriver: awslogs
+      #     Options:
+      #       awslogs-group: !Ref CloudWatchLogGroup
+      #       awslogs-region: !Ref AWS::Region
+      #       awslogs-stream-prefix: "service-connect"
+  
+  # ============================================================================
+  # SECURITY GROUPS
+  # ============================================================================
+  
+  ECSContainerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub "${ServiceName}-container-sg"
+      GroupDescription: "Security group for ECS container"
+      VpcId: !Ref VpcId
+      # Optional: Additional ingress rules
+      # SecurityGroupIngress:
+      #   - IpProtocol: tcp
+      #     FromPort: 22
+      #     ToPort: 22
+      #     CidrIp: 10.0.0.0/8
+      #     Description: "SSH access from VPC"
+  
+  # ============================================================================
+  # OPTIONAL RESOURCES (COMMENTED OUT)
+  # ============================================================================
+  
+  # Auto Scaling
+  # AutoScalingTarget:
+  #   Type: AWS::ApplicationAutoScaling::ScalableTarget
+  #   Properties:
+  #     MaxCapacity: !Ref MaxCapacity
+  #     MinCapacity: !Ref MinCapacity
+  #     ResourceId: !Sub "service/${ECSCluster.Name}/${ECSService.Name}"
+  #     RoleARN: !Sub "arn:aws:iam::${AWS::AccountId}:role/aws-service-role/ecs.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_ECSService"
+  #     ScalableDimension: ecs:service:DesiredCount
+  #     ServiceNamespace: ecs
+  #     DependsOn: AutoScalingRole
+  
+  # AutoScalingPolicy:
+  #   Type: AWS::ApplicationAutoScaling::ScalingPolicy
+  #   Properties:
+  #     PolicyName: !Sub "${ServiceName}-cpu-scaling"
+  #     PolicyType: TargetTrackingScaling
+  #     ScalingTargetId: !Ref AutoScalingTarget
+  #     TargetTrackingScalingPolicyConfiguration:
+  #       PredefinedMetricSpecification:
+  #         PredefinedMetricType: ECSServiceAverageCPUUtilization
+  #       TargetValue: !Ref TargetCpuUtilization
+  #       ScaleOutCooldown: 300
+  #       ScaleInCooldown: 300
+  
+  # EFS Resources (if enabled)
+  # EFSSecurityGroup:
+  #   Type: AWS::EC2::SecurityGroup
+  #   Properties:
+  #     VpcId: !Ref VpcId
+  #     GroupDescription: "Security group for EFS access"
+  #     SecurityGroupIngress:
+  #       - IpProtocol: tcp
+  #         FromPort: 2049
+  #         ToPort: 2049
+  #         SourceSecurityGroupId: !Ref ECSContainerSecurityGroup
+  
+  # FileSystem:
+  #   Type: AWS::EFS::FileSystem
+  #   Properties:
+  #     Encrypted: true
+  #     FileSystemTags:
+  #       - Key: Name
+  #         Value: !Sub "${ServiceName}-efs"
+  #     PerformanceMode: generalPurpose
+  #     ThroughputMode: bursting
+  
+  # MountTarget1:
+  #   Type: AWS::EFS::MountTarget
+  #   Properties:
+  #     FileSystemId: !Ref FileSystem
+  #     SubnetId: !Select [0, !Ref SubnetIds]
+  #     SecurityGroups:
+  #       - !GetAtt EFSSecurityGroup.GroupId
+  
+  # MountTarget2:
+  #   Type: AWS::EFS::MountTarget
+  #   Properties:
+  #     FileSystemId: !Ref FileSystem
+  #     SubnetId: !Select [1, !Ref SubnetIds]
+  #     SecurityGroups:
+  #       - !GetAtt EFSSecurityGroup.GroupId
+  
+  # AccessPoint:
+  #   Type: AWS::EFS::AccessPoint
+  #   Properties:
+  #     FileSystemId: !Ref FileSystem
+  #     PosixUser:
+  #       Uid: "1000"
+  #       Gid: "1000"
+  #     RootDirectory:
+  #       CreationInfo:
+  #         OwnerGid: "1000"
+  #         OwnerUid: "1000"
+  #         Permissions: "755"
+  #       Path: "/data"
+  
+  # Service Discovery (if enabled)
+  # ServiceDiscoveryNamespace:
+  #   Type: AWS::ServiceDiscovery::PrivateDnsNamespace
+  #   Properties:
+  #     Name: !Ref ServiceDiscoveryNamespace
+  #     Vpc: !Ref VpcId
+  
+  # ServiceDiscoveryService:
+  #   Type: AWS::ServiceDiscovery::Service
+  #   Properties:
+  #     DnsConfig:
+  #       RoutingPolicy: MULTIVALUE
+  #       DnsRecords:
+  #         - TTL: 60
+  #           Type: A
+  #         - TTL: 60
+  #           Type: SRV
+  #     Name: !Ref ServiceName
+  #     NamespaceId: !Ref ServiceDiscoveryNamespace
+
+# ============================================================================
+# CONDITIONS
+# ============================================================================
+
+Conditions:
+  IsInternal: !Equals [!Ref LoadBalancerScheme, "internal"]
+  # EnableAutoScaling: !Equals [!Ref EnableAutoScaling, "true"]
+  # EnableEFS: !Equals [!Ref EnableEFS, "true"]
+  # EnableServiceDiscovery: !Equals [!Ref EnableServiceDiscovery, "true"]
+
+# ============================================================================
+# OUTPUTS
+# ============================================================================
+
+Outputs:
+  LoadBalancerDNSName:
+    Description: "DNS name of the load balancer"
+    Value: !GetAtt LoadBalancer.DNSName
+    Export:
+      Name: !Sub "${AWS::StackName}-LoadBalancerDNS"
+  
+  LoadBalancerUrl:
+    Description: "URL to access the application"
+    Value: !Sub "http://${LoadBalancer.DNSName}"
+    Export:
+      Name: !Sub "${AWS::StackName}-LoadBalancerUrl"
+  
+  ClusterName:
+    Description: "Name of the ECS cluster"
+    Value: !Ref ClusterName
+    Export:
+      Name: !Sub "${AWS::StackName}-ClusterName"
+  
+  ServiceName:
+    Description: "Name of the ECS service"
+    Value: !Ref ServiceName
+    Export:
+      Name: !Sub "${AWS::StackName}-ServiceName"
+  
+  TaskDefinitionArn:
+    Description: "ARN of the task definition"
+    Value: !Ref TaskDefinition
+    Export:
+      Name: !Sub "${AWS::StackName}-TaskDefinitionArn"
+  
+  # Optional: EFS outputs (if enabled)
+  # FileSystemId:
+  #   Description: "ID of the EFS file system"
+  #   Value: !Ref FileSystem
+  #   Export:
+  #     Name: !Sub "${AWS::StackName}-FileSystemId"
+  
+  # AccessPointId:
+  #   Description: "ID of the EFS access point"
+  #   Value: !Ref AccessPoint
+  #   Export:
+  #     Name: !Sub "${AWS::StackName}-AccessPointId"
+  
+  # Optional: Service discovery outputs (if enabled)
+  # ServiceDiscoveryNamespaceId:
+  #   Description: "ID of the service discovery namespace"
+  #   Value: !Ref ServiceDiscoveryNamespace
+  #   Export:
+  #     Name: !Sub "${AWS::StackName}-ServiceDiscoveryNamespaceId"
+  
+  # ServiceDiscoveryServiceArn:
+  #   Description: "ARN of the service discovery service"
+  #   Value: !GetAtt ServiceDiscoveryService.Arn
+  #   Export:
+  #     Name: !Sub "${AWS::StackName}-ServiceDiscoveryServiceArn" 

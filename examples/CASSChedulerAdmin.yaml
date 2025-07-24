@@ -543,4 +543,3 @@ Outputs:
 #    Value: !Ref casschedulerAgentSecurityGroup
   casschedulerExecutionRole:
     Value: !GetAtt casschedulerExecutionRole.Arn
-

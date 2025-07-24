@@ -1,0 +1,43 @@
+# CASSchedulerAdmin Deployment Values
+# This file maps the specific CASSchedulerAdmin example to the generic ECS deployment template
+
+# Required Parameters
+VpcId: "vpc-42de9927"
+SubnetIds: ["subnet-c56802b2", "subnet-103d3874"]
+ClusterName: "casscheduler-cluster"
+ContainerImage: "cas-snapshots/cas-scheduler-admin:3.2.8-snapshot"
+ContainerPort: 8080
+LoadBalancerPort: 443
+
+# Optional Parameters
+ServiceName: "casscheduler"
+DesiredCount: 1
+CpuUnits: 2048
+MemoryMiB: 4096
+LoadBalancerScheme: "internal"
+HealthCheckPath: "/CASSchedulerAdmin/info"
+HealthCheckGracePeriodSeconds: 600
+AllowedCidr: "10.0.0.0/8"
+
+# Advanced Parameters (matching the specific example)
+CertificateArn: "arn:aws:acm:us-west-2:275416279984:certificate/87de9dbf-75e1-4fef-badf-834846d72d02"
+
+# Optional Advanced Features (commented out in original)
+# EnableAutoScaling: false
+# MinCapacity: 1
+# MaxCapacity: 3
+# TargetCpuUtilization: 70
+
+# EFS Configuration (commented out in original)
+# EnableEFS: false
+# FileSystemId: "fs-96ab4190"
+# AccessPointId: "fsap-004063542501d0ed2"
+
+# Service Discovery (enabled in original)
+EnableServiceDiscovery: true
+ServiceDiscoveryNamespace: "casscheduler.local"
+
+# Cross-Account Access (commented out in original)
+# TrackCargoAcct: 689838003629
+# MlscAcct: 129791073898
+# SpanAcct: 110150137605 
