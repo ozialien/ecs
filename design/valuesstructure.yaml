@@ -1,0 +1,88 @@
+# --- Metadata (like Chart.yaml) ---
+metadata:
+ name: "my-service"
+ version: "1.0.0"
+ description: "Example ECS Service"
+
+# --- Infrastructure (VPC, Networking) ---
+infrastructure:
+ vpc:
+   id: "vpc-123456"  # or `createNew: true`
+   subnets: ["subnet-123", "subnet-456"]  # or auto-select via `type: [public|private]`
+ securityGroups:
+   - name: "app-sg"
+     rules:
+       - port: 80
+         cidr: "0.0.0.0/0"
+       - port: 443
+         cidr: "10.0.0.0/16"
+
+# --- Compute (Fargate/EC2) ---
+compute:
+ type: "FARGATE"  # or "EC2"
+ cpu: 1024        # 0.25 vCPU to 4 vCPU (Fargate increments)
+ memory: 2048     # MB (must match Fargate combinations)
+ runtimePlatform:  # Optional (ARM/x86)
+   cpuArchitecture: "X86_64"
+   os: "LINUX"
+
+# --- Container Definition ---
+containers:
+ - name: "app"
+   image: "public.ecr.aws/nginx:latest"
+   portMappings:
+     - containerPort: 80
+       hostPort: 80
+       protocol: "tcp"
+   environment:
+     - name: "ENV"
+       value: "prod"
+   secrets:  # SSM or Secrets Manager
+     - name: "DB_PASSWORD"
+       valueFrom: "arn:aws:ssm:us-east-1:123456789:parameter/db_password"
+   healthCheck:
+     command: ["CMD-SHELL", "curl -f http://localhost/health || exit 1"]
+     interval: 30
+     timeout: 5
+
+# --- Service Configuration ---
+service:
+ type: "LOAD_BALANCED"  # or "DAEMON", "SCHEDULED"
+ loadBalancer:
+   type: "APPLICATION"  # or "NETWORK"
+   targetGroup:
+     healthCheckPath: "/health"
+     stickiness: true
+ scaling:
+   min: 2
+   max: 10
+   metrics:
+     - type: "CPUUtilization"
+       target: 70
+     - type: "MemoryUtilization"
+       target: 60
+ deployment:
+   strategy: "ROLLING"  # or "BLUE_GREEN", "CANARY"
+   waitForSteadyState: true
+
+# --- IAM (Permissions) ---
+iam:
+ taskRole:
+   policies:
+     - "AmazonECS_FullAccess"  # Managed policy ARN
+     - custom: |
+         {
+           "Version": "2012-10-17",
+           "Statement": [{ "Effect": "Allow", "Action": "s3:GetObject", "Resource": "*" }]
+         }
+
+# --- Add-ons (Optional) ---
+addons:
+ logging:
+   driver: "awslogs"
+   options:
+     awslogs-group: "/ecs/my-service"
+     awslogs-region: "us-east-1"
+ monitoring:
+   enableXRay: true
+   enableCloudWatchAlarms: true
