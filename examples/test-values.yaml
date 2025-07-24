@@ -1,0 +1,132 @@
+# Test Values File for CAS ERD Service
+# Based on CloudFormation template: cf/cas-erd-svc.yaml
+# 
+# Usage for testing:
+# AWS_PROFILE=dev cdk deploy -c valuesFile=examples/test-values.yaml
+
+metadata:
+  name: "cas-erd-svc-test"
+  version: "2.0.0"
+  description: "Test deployment for CAS ERD Service"
+
+infrastructure:
+  vpc:
+    id: "vpc-42de9927"
+    subnets: ["subnet-103d3874", "subnet-c56802b2"]
+
+cluster:
+  name: "cas-erd-svc-test-cluster"
+  containerInsights: true
+
+taskDefinition:
+  type: "FARGATE"
+  cpu: 256
+  memory: 512
+  containers:
+    - name: "cas-erd-svc-test"
+      image: "275416279984.dkr.ecr.us-west-2.amazonaws.com/cas-erd-svc:2.0.0"
+      portMappings:
+        - containerPort: 8080
+          protocol: "tcp"
+      environment:
+        - name: "APP_ENV"
+          value: "test"
+        - name: "AWS_DEFAULT_REGION"
+          value: "us-west-2"
+        - name: "AWS_REGION"
+          value: "us-west-2"
+        - name: "AWS_SDK_LOAD_CONFIG"
+          value: "1"
+        - name: "AWS_ENABLE_ENDPOINT_DISCOVERY"
+          value: "true"
+      essential: true
+
+service:
+  type: "LOAD_BALANCED"
+  desiredCount: 1
+  deployment:
+    strategy: "ROLLING"
+    minimumHealthyPercent: 50
+    maximumPercent: 200
+  healthCheckGracePeriodSeconds: 60
+  networkConfiguration:
+    assignPublicIp: false
+
+loadBalancer:
+  type: "APPLICATION"
+  scheme: "internal"
+  protocol: "HTTP"
+  port: 80
+  allowedCidr: "10.120.0.0/24"
+  targetGroup:
+    healthCheckPath: "/casreferenceservice/"
+    healthyHttpCodes: "200"
+    interval: 30
+    timeout: 5
+    healthyThresholdCount: 2
+    unhealthyThresholdCount: 3
+
+autoScaling:
+  enabled: false
+  minCapacity: 1
+  maxCapacity: 1
+  targetCpuUtilization: 70
+  targetMemoryUtilization: 70
+
+iam:
+  taskRole:
+    permissions:
+      secretsManager:
+        actions:
+          - "secretsmanager:DescribeSecret"
+          - "secretsmanager:GetResourcePolicy"
+          - "secretsmanager:GetSecretValue"
+          - "secretsmanager:ListSecretVersionIds"
+          - "secretsmanager:ListSecrets"
+        resources: ["arn:aws:secretsmanager:us-west-2:275416279984:secret:*"]
+      cloudWatchLogs:
+        actions:
+          - "logs:CreateLogGroup"
+          - "logs:CreateLogStream"
+          - "logs:DescribeLogStreams"
+          - "logs:PutLogEvents"
+        resources: ["*"]
+      sts:
+        actions:
+          - "sts:AssumeRole"
+        resources: ["*"]
+      kms:
+        actions:
+          - "kms:Decrypt"
+          - "kms:DescribeKey"
+        resources: ["arn:aws:kms:us-west-2:275416279984:key/*"]
+  taskExecutionRole:
+    permissions:
+      cloudWatchLogs:
+        actions:
+          - "logs:CreateLogStream"
+          - "logs:PutLogEvents"
+        resources: ["*"]
+
+serviceDiscovery:
+  enabled: true
+  namespace:
+    name: "caserd-test.local"
+    type: "private"
+  service:
+    name: "cas-erd-svc-test"
+    dnsType: "A"
+    ttl: 60
+    routingPolicy: "MULTIVALUE"
+
+addons:
+  logging:
+    driver: "awslogs"
+    options:
+      awslogs-group: "/ecs/cas-erd-svc-test"
+      awslogs-stream-prefix: "cas-erd-svc-test"
+      awslogs-region: "us-west-2"
+    retentionDays: 7
+  monitoring:
+    enableXRay: false
+    enableCloudWatchAlarms: false 
