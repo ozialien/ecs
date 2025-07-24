@@ -566,7 +566,7 @@ Create a cdk deployment tool for deploying ecs environments.
   cluster:
     name: "my-cluster"
     containerInsights: true
-  
+
   # --- Task Definition ---
   taskDefinition:
     type: "FARGATE"
@@ -577,18 +577,18 @@ Create a cdk deployment tool for deploying ecs environments.
         image: "nginx:alpine"
         portMappings:
           - containerPort: 80
-  
+
   # --- ECS Service ---
   service:
     type: "LOAD_BALANCED"
     desiredCount: 2
-  
+
   # --- Load Balancer ---
   loadBalancer:
     type: "APPLICATION"
     targetGroup:
       healthCheckPath: "/health"
-  
+
   # --- Auto Scaling ---
   autoScaling:
     enabled: true
@@ -604,3 +604,19 @@ Create a cdk deployment tool for deploying ecs environments.
 - **Lesson**: Always map to actual AWS resource hierarchy, not logical grouping
 - **Requirement**: Structure must reflect how CDK constructs ECS resources
 - **Follow-up**: All examples updated to follow ECS object hierarchy
+
+#### 31. Comprehensive Documentation Update - Help and CLI Consistency
+- **Requirement**: All documentation must reflect the new ECS hierarchy structure
+- **Issue**: Help system and CLI examples still showed old flat structure
+- **Updates Made**:
+  - **lib/help.ts**: Added structured format documentation with ECS hierarchy examples
+  - **lib/cli.ts**: Updated values file support description to mention both legacy and structured formats
+  - **context.md**: Documented the comprehensive update process
+- **Key Changes**:
+  - Added "📋 STRUCTURED VALUES FILE FORMAT" section to help
+  - Updated values file examples to show both legacy and new formats
+  - Added ECS hierarchy explanation in CLI help
+  - Maintained backward compatibility documentation
+- **Lesson**: When changing core structure, must update ALL documentation comprehensively
+- **Requirement**: Help system must always reflect current implementation
+- **Follow-up**: All documentation now consistent with ECS hierarchy structure

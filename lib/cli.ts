@@ -183,9 +183,13 @@ VALUES FILE SUPPORT:
   matson-ecs deploy --context valuesFile=values.yaml
 
   Values file can be JSON, YAML, or JS format:
-  - values.json
-  - values.yaml
+  - values.json (legacy flat format)
+  - values.yaml (new structured ECS hierarchy format)
   - values.js
+
+  The CDK supports both legacy flat format and new structured ECS hierarchy format.
+  Structured format follows ECS object hierarchy: metadata, infrastructure, cluster, 
+  taskDefinition, service, loadBalancer, autoScaling, iam, serviceDiscovery, addons.
 
 CONTEXT PARAMETERS:
   All configuration is done via --context parameters:

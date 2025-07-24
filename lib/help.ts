@@ -97,6 +97,60 @@ OPTIONAL PARAMETERS:
   taskRolePermissions      IAM permissions for task role (optional)
   taskExecutionRolePermissions IAM permissions for task execution role (optional)
   valuesFile               Values file path for loading configuration from file
+
+📋 STRUCTURED VALUES FILE FORMAT
+===============================
+
+The CDK supports both legacy flat format and new structured ECS hierarchy format:
+
+LEGACY FLAT FORMAT (Backward Compatible):
+  {
+    "vpcId": "vpc-12345678",
+    "subnetIds": ["subnet-12345678", "subnet-87654321"],
+    "clusterName": "my-cluster",
+    "image": "nginx:alpine",
+    "cpu": 256,
+    "memory": 512
+  }
+
+NEW STRUCTURED FORMAT (ECS Hierarchy):
+  metadata:
+    name: "my-service"
+    version: "1.0.0"
+  
+  infrastructure:
+    vpc:
+      id: "vpc-12345678"
+      subnets: ["subnet-12345678", "subnet-87654321"]
+  
+  cluster:
+    name: "my-cluster"
+    containerInsights: true
+  
+  taskDefinition:
+    type: "FARGATE"
+    cpu: 256
+    memory: 512
+    containers:
+      - name: "app"
+        image: "nginx:alpine"
+        portMappings:
+          - containerPort: 80
+  
+  service:
+    type: "LOAD_BALANCED"
+    desiredCount: 2
+  
+  loadBalancer:
+    type: "APPLICATION"
+    port: 80
+    targetGroup:
+      healthCheckPath: "/health"
+  
+  autoScaling:
+    enabled: true
+    minCapacity: 2
+    maxCapacity: 10
   
 ADVANCED FEATURES:
   healthCheck              Container health check configuration
@@ -129,7 +183,9 @@ VALUES FILE FORMAT:
   JavaScript: values.js
   YAML: values.yaml (requires js-yaml package)
 
-📁 VALUES FILE EXAMPLE (values.json):
+📁 VALUES FILE EXAMPLES:
+
+LEGACY FORMAT (values.json):
 {
   "vpcId": "vpc-12345678",
   "subnetIds": ["subnet-12345678", "subnet-87654321"],
@@ -147,6 +203,50 @@ VALUES FILE FORMAT:
     "API_VERSION": "v1"
   }
 }
+
+NEW STRUCTURED FORMAT (values.yaml):
+metadata:
+  name: "myapp-api"
+  version: "1.0.0"
+
+infrastructure:
+  vpc:
+    id: "vpc-12345678"
+    subnets: ["subnet-12345678", "subnet-87654321"]
+
+cluster:
+  name: "my-cluster"
+  containerInsights: true
+
+taskDefinition:
+  type: "FARGATE"
+  cpu: 512
+  memory: 1024
+  containers:
+    - name: "app"
+      image: "nginx:alpine"
+      portMappings:
+        - containerPort: 80
+      environment:
+        - name: "NODE_ENV"
+          value: "production"
+        - name: "API_VERSION"
+          value: "v1"
+
+service:
+  type: "LOAD_BALANCED"
+  desiredCount: 2
+
+loadBalancer:
+  type: "APPLICATION"
+  port: 80
+  targetGroup:
+    healthCheckPath: "/health"
+
+autoScaling:
+  enabled: true
+  minCapacity: 1
+  maxCapacity: 5
 
 🔧 DEPLOYMENT COMMANDS
 ======================
