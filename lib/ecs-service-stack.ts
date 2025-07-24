@@ -754,17 +754,16 @@ export class EcsServiceStack extends cdk.Stack {
     });
 
     // Configure health check on the target group
-    if (config.healthCheckPath || config.loadBalancerHealthCheck) {
+    if (config.loadBalancer.targetGroup?.healthCheckPath) {
       const targetGroup = service.targetGroup;
-      const healthCheckConfig = config.loadBalancerHealthCheck || {};
       
       targetGroup.configureHealthCheck({
-        path: healthCheckConfig.path || config.healthCheckPath || '/',
-        healthyHttpCodes: healthCheckConfig.healthyHttpCodes || '200',
-        interval: this.convertToDuration(healthCheckConfig.interval) || cdk.Duration.seconds(30),
-        timeout: this.convertToDuration(healthCheckConfig.timeout) || cdk.Duration.seconds(5),
-        healthyThresholdCount: healthCheckConfig.healthyThresholdCount || 2,
-        unhealthyThresholdCount: healthCheckConfig.unhealthyThresholdCount || 3,
+        path: config.loadBalancer.targetGroup.healthCheckPath || '/',
+        healthyHttpCodes: '200',
+        interval: cdk.Duration.seconds(30),
+        timeout: cdk.Duration.seconds(5),
+        healthyThresholdCount: 2,
+        unhealthyThresholdCount: 3,
       });
     }
 
@@ -793,10 +792,10 @@ export class EcsServiceStack extends cdk.Stack {
     // Check if service discovery configuration exists
     if (!config.serviceDiscovery) return;
 
-    const stackName = config.stackName || this.stackName;
+    const stackName = config.metadata?.name || this.stackName;
     const namespaceName = typeof config.serviceDiscovery.namespace === 'string' 
       ? config.serviceDiscovery.namespace 
-      : config.serviceDiscovery.namespace?.name || `${config.stackName}.local`;
+      : config.serviceDiscovery.namespace?.name || `${stackName}.local`;
     
     const namespace = new servicediscovery.PrivateDnsNamespace(this, `${stackName}Namespace`, {
       name: namespaceName,
@@ -888,18 +887,18 @@ export class EcsServiceStack extends cdk.Stack {
    * Add auto scaling to the service
    */
   private addAutoScaling(config: EcsServiceConfig): void {
-    const stackName = config.stackName || this.stackName;
+    const stackName = config.metadata?.name || this.stackName;
     const scaling = this.service.autoScaleTaskCount({
-      minCapacity: config.minCapacity!,
-      maxCapacity: config.maxCapacity!,
+      minCapacity: config.autoScaling?.minCapacity || DEFAULT_CONFIG.MIN_CAPACITY,
+      maxCapacity: config.autoScaling?.maxCapacity || DEFAULT_CONFIG.MAX_CAPACITY,
     });
 
     scaling.scaleOnCpuUtilization(`${stackName}CpuScaling`, {
-      targetUtilizationPercent: config.targetCpuUtilization!,
+      targetUtilizationPercent: config.autoScaling?.targetCpuUtilization || DEFAULT_CONFIG.TARGET_CPU_UTILIZATION,
     });
 
     scaling.scaleOnMemoryUtilization(`${stackName}MemoryScaling`, {
-      targetUtilizationPercent: config.targetMemoryUtilization!,
+      targetUtilizationPercent: config.autoScaling?.targetMemoryUtilization || DEFAULT_CONFIG.TARGET_MEMORY_UTILIZATION,
     });
   }
 
@@ -907,8 +906,8 @@ export class EcsServiceStack extends cdk.Stack {
    * Add CloudFormation outputs
    */
   private addOutputs(config: EcsServiceConfig): void {
-    const stackName = config.metadata?.name || config.stackName || this.stackName;
-    const clusterName = config.cluster?.name || config.clusterName;
+    const stackName = config.metadata?.name || this.stackName;
+    const clusterName = config.cluster?.name;
     
     new cdk.CfnOutput(this, 'ServiceName', {
       value: stackName,
