@@ -225,6 +225,7 @@ export class EcsServiceStack extends cdk.Stack {
       
       loadBalancer: {
         type: this.getContextValue('loadBalancer.type', valuesFile.loadBalancer?.type || testConfig.loadBalancer?.type) ?? 'APPLICATION',
+        scheme: this.getContextValue('loadBalancer.scheme', valuesFile.loadBalancer?.scheme || testConfig.loadBalancer?.scheme),
         protocol: this.getContextValue('loadBalancer.protocol', valuesFile.loadBalancer?.protocol || testConfig.loadBalancer?.protocol) ?? 'HTTP',
         port: this.getNumericContextValue('loadBalancer.port', valuesFile.loadBalancer?.port || testConfig.loadBalancer?.port) ?? this.requireContext('loadBalancer.port'),
         certificateArn: this.getContextValue('loadBalancer.certificateArn', valuesFile.loadBalancer?.certificateArn || testConfig.loadBalancer?.certificateArn),
@@ -872,13 +873,12 @@ export class EcsServiceStack extends cdk.Stack {
 
     // Determine load balancer scheme - default to internet-facing if not specified
     const scheme = config.loadBalancer.scheme || 'internet-facing';
-    const publicLoadBalancer = scheme === 'internet-facing';
 
     const service = new ecs_patterns.ApplicationLoadBalancedFargateService(this, `${stackName}Service`, {
       cluster: this.cluster,
       taskDefinition: taskDefinition,
       desiredCount: config.service.desiredCount,
-      publicLoadBalancer: publicLoadBalancer,
+      publicLoadBalancer: scheme === 'internet-facing',
       listenerPort: listenerPort,
       protocol: useHttps ? elbv2.ApplicationProtocol.HTTPS : elbv2.ApplicationProtocol.HTTP,
       certificate: certificate,
