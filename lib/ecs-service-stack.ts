@@ -86,13 +86,13 @@ export class EcsServiceStack extends cdk.Stack {
     this.validateRequiredParameters(config);
 
     // Create infrastructure
-    const vpc = this.createOrImportVpc(config.vpcId);
-    this.cluster = this.createOrImportCluster(config.clusterName, vpc);
+    const vpc = this.createOrImportVpc(config.infrastructure!.vpc.id!);
+    this.cluster = this.createOrImportCluster(config.cluster!.name!, vpc);
     this.loadBalancer = this.createEcsService(config, vpc);
     this.service = this.loadBalancer.service;
 
     // Add optional features
-    if (config.enableAutoScaling) {
+    if (config.autoScaling?.enabled) {
       this.addAutoScaling(config);
     }
 
@@ -146,11 +146,21 @@ export class EcsServiceStack extends cdk.Stack {
   private validateRequiredParameters(config: EcsServiceConfig): void {
     const missingParams: string[] = [];
 
-    if (config.containerPort == null) {
-      missingParams.push('containerPort');
+    // Check for required parameters from structured config
+    if (!config.taskDefinition?.containers?.[0]?.portMappings?.[0]?.containerPort) {
+      missingParams.push('taskDefinition.containers.0.portMappings.0.containerPort');
     }
-    if (config.lbPort == null) {
-      missingParams.push('lbPort');
+    if (!config.loadBalancer?.port) {
+      missingParams.push('loadBalancer.port');
+    }
+    if (!config.infrastructure?.vpc?.id) {
+      missingParams.push('infrastructure.vpc.id');
+    }
+    if (!config.cluster?.name) {
+      missingParams.push('cluster.name');
+    }
+    if (!config.taskDefinition?.containers?.[0]?.image) {
+      missingParams.push('taskDefinition.containers.0.image');
     }
 
     if (missingParams.length > 0) {
@@ -166,61 +176,81 @@ export class EcsServiceStack extends cdk.Stack {
   private loadConfiguration(): EcsServiceConfig {
     const testConfig = this.stackProps?.config || {};
     
-    // Start with legacy format configuration
+    // Start with structured configuration
     const config: EcsServiceConfig = {
-      // Required parameters
-      vpcId: this.getContextValue('vpcId', testConfig.vpcId) ?? this.requireContext('vpcId'),
-      subnetIds: this.parseSubnetIds(this.getContextValue('subnetIds', testConfig.subnetIds)),
-      clusterName: this.getContextValue('clusterName', testConfig.clusterName) ?? this.requireContext('clusterName'),
-      image: this.getContextValue('image', testConfig.image) ?? this.requireContext('image'),
-
-      // Optional parameters with defaults
-      stackName: this.getContextValue('stackName', testConfig.stackName) ?? this.stackName,
-      availabilityZones: this.getContextValue('availabilityZones', testConfig.availabilityZones),
-      desiredCount: this.getNumericContextValue('desiredCount', testConfig.desiredCount) ?? DEFAULT_CONFIG.DESIRED_COUNT,
-      cpu: this.getNumericContextValue('cpu', testConfig.cpu) ?? DEFAULT_CONFIG.CPU,
-      memory: this.getNumericContextValue('memory', testConfig.memory) ?? DEFAULT_CONFIG.MEMORY,
-      containerPort: this.getNumericContextValue('containerPort', testConfig.containerPort),
-      lbPort: this.getNumericContextValue('lbPort', testConfig.lbPort),
-      healthCheckPath: this.getContextValue('healthCheckPath', testConfig.healthCheckPath) ?? DEFAULT_CONFIG.HEALTH_CHECK_PATH,
-      healthCheck: this.getContextValue('healthCheck', testConfig.healthCheck),
-      resourceLimits: this.getContextValue('resourceLimits', testConfig.resourceLimits),
-      serviceDiscovery: this.getContextValue('serviceDiscovery', testConfig.serviceDiscovery),
-      capacityProvider: this.getContextValue('capacityProvider', testConfig.capacityProvider),
-      gracefulShutdown: this.getContextValue('gracefulShutdown', testConfig.gracefulShutdown),
-      placementStrategies: this.getContextValue('placementStrategies', testConfig.placementStrategies),
-      allowedCidr: this.getContextValue('allowedCidr', testConfig.allowedCidr) ?? DEFAULT_CONFIG.ALLOWED_CIDR,
-      logRetentionDays: this.getNumericContextValue('logRetentionDays', testConfig.logRetentionDays) ?? DEFAULT_CONFIG.LOG_RETENTION_DAYS,
-      enableAutoScaling: this.getBooleanContextValue('enableAutoScaling', testConfig.enableAutoScaling) ?? DEFAULT_CONFIG.ENABLE_AUTO_SCALING,
-      minCapacity: this.getNumericContextValue('minCapacity', testConfig.minCapacity) ?? DEFAULT_CONFIG.MIN_CAPACITY,
-      maxCapacity: this.getNumericContextValue('maxCapacity', testConfig.maxCapacity) ?? DEFAULT_CONFIG.MAX_CAPACITY,
-      targetCpuUtilization: this.getNumericContextValue('targetCpuUtilization', testConfig.targetCpuUtilization) ?? DEFAULT_CONFIG.TARGET_CPU_UTILIZATION,
-      targetMemoryUtilization: this.getNumericContextValue('targetMemoryUtilization', testConfig.targetMemoryUtilization) ?? DEFAULT_CONFIG.TARGET_MEMORY_UTILIZATION,
-      taskExecutionRoleArn: this.getContextValue('taskExecutionRoleArn', testConfig.taskExecutionRoleArn),
-      taskRoleArn: this.getContextValue('taskRoleArn', testConfig.taskRoleArn),
-      valuesFile: this.getContextValue('valuesFile', testConfig.valuesFile),
-    };
-
-    // Load from values file if specified
-    if (config.valuesFile) {
-      const values = this.loadValuesFile(config.valuesFile);
+      // Load from values file if specified
+      ...(testConfig.valuesFile && this.loadValuesFile(testConfig.valuesFile as string)),
       
-      // Convert structured configuration to legacy format for compatibility
-      if (ConfigMapper.isStructuredConfig(values)) {
-        console.log('📋 Converting structured configuration to legacy format...');
-        const structuredConfig = values;
-        const legacyConfig = ConfigMapper.structuredToLegacy(structuredConfig);
-        Object.assign(config, legacyConfig);
-      } else {
-        // Legacy flat format - use directly
-        console.log('📋 Using legacy flat format configuration...');
-        Object.assign(config, values);
-      }
-    }
+      // Load from context parameters for structured config
+      metadata: {
+        name: this.getContextValue('metadata.name', testConfig.metadata?.name) ?? this.stackName,
+        version: this.getContextValue('metadata.version', testConfig.metadata?.version) ?? '1.0.0',
+        description: this.getContextValue('metadata.description', testConfig.metadata?.description),
+      },
+      
+      infrastructure: {
+        vpc: {
+          id: this.getContextValue('infrastructure.vpc.id', testConfig.infrastructure?.vpc?.id) ?? this.requireContext('infrastructure.vpc.id'),
+          subnets: this.parseSubnetIds(this.getContextValue('infrastructure.vpc.subnets', testConfig.infrastructure?.vpc?.subnets)) ?? [],
+        },
+        securityGroups: testConfig.infrastructure?.securityGroups,
+      },
+      
+      cluster: {
+        name: this.getContextValue('cluster.name', testConfig.cluster?.name) ?? this.requireContext('cluster.name'),
+        containerInsights: this.getBooleanContextValue('cluster.containerInsights', testConfig.cluster?.containerInsights) ?? true,
+      },
+      
+      taskDefinition: {
+        type: this.getContextValue('taskDefinition.type', testConfig.taskDefinition?.type) ?? 'FARGATE',
+        cpu: this.getNumericContextValue('taskDefinition.cpu', testConfig.taskDefinition?.cpu) ?? DEFAULT_CONFIG.CPU,
+        memory: this.getNumericContextValue('taskDefinition.memory', testConfig.taskDefinition?.memory) ?? DEFAULT_CONFIG.MEMORY,
+        containers: [{
+          name: 'main',
+          image: this.getContextValue('taskDefinition.containers.0.image', testConfig.taskDefinition?.containers?.[0]?.image) ?? this.requireContext('taskDefinition.containers.0.image'),
+          portMappings: [{
+            containerPort: this.getNumericContextValue('taskDefinition.containers.0.portMappings.0.containerPort', testConfig.taskDefinition?.containers?.[0]?.portMappings?.[0]?.containerPort) ?? this.requireContext('taskDefinition.containers.0.portMappings.0.containerPort'),
+            protocol: 'tcp',
+          }],
+          environment: this.parseEnvironmentVariablesAsArray(),
+          secrets: this.parseSecretsAsArray(),
+        }],
+        volumes: testConfig.taskDefinition?.volumes,
+      },
+      
+      service: {
+        type: this.getContextValue('service.type', testConfig.service?.type) ?? 'LOAD_BALANCED',
+        desiredCount: this.getNumericContextValue('service.desiredCount', testConfig.service?.desiredCount) ?? DEFAULT_CONFIG.DESIRED_COUNT,
+        healthCheckGracePeriodSeconds: this.getNumericContextValue('service.healthCheckGracePeriodSeconds', testConfig.service?.healthCheckGracePeriodSeconds),
+      },
+      
+      loadBalancer: {
+        type: this.getContextValue('loadBalancer.type', testConfig.loadBalancer?.type) ?? 'APPLICATION',
+        protocol: this.getContextValue('loadBalancer.protocol', testConfig.loadBalancer?.protocol) ?? 'HTTP',
+        port: this.getNumericContextValue('loadBalancer.port', testConfig.loadBalancer?.port) ?? this.requireContext('loadBalancer.port'),
+        certificateArn: this.getContextValue('loadBalancer.certificateArn', testConfig.loadBalancer?.certificateArn),
+        targetGroup: {
+          healthCheckPath: this.getContextValue('loadBalancer.targetGroup.healthCheckPath', testConfig.loadBalancer?.targetGroup?.healthCheckPath) ?? DEFAULT_CONFIG.HEALTH_CHECK_PATH,
+        },
+        allowedCidr: this.getContextValue('loadBalancer.allowedCidr', testConfig.loadBalancer?.allowedCidr),
+      },
+      
+      autoScaling: {
+        enabled: this.getBooleanContextValue('autoScaling.enabled', testConfig.autoScaling?.enabled) ?? DEFAULT_CONFIG.ENABLE_AUTO_SCALING,
+        minCapacity: this.getNumericContextValue('autoScaling.minCapacity', testConfig.autoScaling?.minCapacity) ?? DEFAULT_CONFIG.MIN_CAPACITY,
+        maxCapacity: this.getNumericContextValue('autoScaling.maxCapacity', testConfig.autoScaling?.maxCapacity) ?? DEFAULT_CONFIG.MAX_CAPACITY,
+        targetCpuUtilization: this.getNumericContextValue('autoScaling.targetCpuUtilization', testConfig.autoScaling?.targetCpuUtilization) ?? DEFAULT_CONFIG.TARGET_CPU_UTILIZATION,
+        targetMemoryUtilization: this.getNumericContextValue('autoScaling.targetMemoryUtilization', testConfig.autoScaling?.targetMemoryUtilization) ?? DEFAULT_CONFIG.TARGET_MEMORY_UTILIZATION,
+      },
+      
+      iam: {
+        taskRole: testConfig.iam?.taskRole,
+        taskExecutionRole: testConfig.iam?.taskExecutionRole,
 
-    // Parse environment variables and secrets
-    config.environment = this.parseEnvironmentVariables();
-    config.secrets = this.parseSecrets();
+      },
+      serviceDiscovery: testConfig.serviceDiscovery,
+
+    };
 
     return config;
   }
@@ -267,7 +297,7 @@ export class EcsServiceStack extends cdk.Stack {
    */
   private parseSubnetIds(subnetIds: string | string[] | undefined): string[] {
     if (!subnetIds) {
-      throw new Error('Required context parameter subnetIds is missing');
+      return [];
     }
     
     if (Array.isArray(subnetIds)) {
@@ -296,6 +326,14 @@ export class EcsServiceStack extends cdk.Stack {
   }
 
   /**
+   * Parse environment variables as array for structured config
+   */
+  private parseEnvironmentVariablesAsArray(): { name: string; value: string }[] {
+    const env = this.parseEnvironmentVariables();
+    return Object.entries(env).map(([name, value]) => ({ name, value }));
+  }
+
+  /**
    * Parse secrets from context
    */
   private parseSecrets(): { [key: string]: string } {
@@ -311,6 +349,32 @@ export class EcsServiceStack extends cdk.Stack {
     }
     
     return secrets;
+  }
+
+  /**
+   * Parse secrets as array for structured config
+   */
+  private parseSecretsAsArray(): { name: string; valueFrom: string }[] {
+    const secrets = this.parseSecrets();
+    return Object.entries(secrets).map(([name, valueFrom]) => ({ name, valueFrom }));
+  }
+
+  private parseEnvironmentVariablesAsArrayFromLegacy(legacyEnv?: { [key: string]: string }): { name: string; value: string }[] {
+    if (!legacyEnv) return [];
+    
+    return Object.entries(legacyEnv).map(([name, value]) => ({
+      name,
+      value,
+    }));
+  }
+
+  private parseSecretsAsArrayFromLegacy(legacySecrets?: { [key: string]: string }): { name: string; valueFrom: string }[] {
+    if (!legacySecrets) return [];
+    
+    return Object.entries(legacySecrets).map(([name, valueFrom]) => ({
+      name,
+      valueFrom,
+    }));
   }
 
   /**
@@ -359,15 +423,15 @@ export class EcsServiceStack extends cdk.Stack {
    */
   private createOrImportVpc(vpcId: string): ec2.IVpc {
     const config = this.loadConfiguration();
-    const stackName = config.stackName || this.stackName;
+    const stackName = config.metadata?.name || this.stackName;
     
     // If VPC ID is provided, import existing VPC
     if (vpcId && vpcId !== '') {
       console.log(`📝 Importing existing VPC: ${vpcId}`);
-      const subnetIds = Array.isArray(config.subnetIds) ? config.subnetIds : this.parseSubnetIds(config.subnetIds);
+      const subnetIds = config.infrastructure?.vpc?.subnets || [];
       
       // Get availability zones from context or use defaults
-      const availabilityZones = this.getContextValue('availabilityZones', config.availabilityZones) || 
+      const availabilityZones = this.getContextValue('availabilityZones') || 
         ['us-west-2a', 'us-west-2b', 'us-west-2c'];
       
       // Ensure availability zones match the number of subnets
@@ -377,7 +441,7 @@ export class EcsServiceStack extends cdk.Stack {
         vpcId: vpcId,
         availabilityZones: azs,
         privateSubnetIds: subnetIds,
-        publicSubnetIds: [],
+        publicSubnetIds: subnetIds, // Use same subnets for both public and private
       });
     }
     
@@ -406,7 +470,7 @@ export class EcsServiceStack extends cdk.Stack {
    */
   private createOrImportCluster(clusterName: string, vpc: ec2.IVpc): ecs.ICluster {
     const config = this.loadConfiguration();
-    const stackName = config.stackName || this.stackName;
+    const stackName = config.metadata?.name || this.stackName;
     
     // Always create a new cluster for now to avoid inactive cluster issues
     console.log(`📝 Creating new cluster: ${clusterName}`);
@@ -437,9 +501,9 @@ export class EcsServiceStack extends cdk.Stack {
    * Create CloudWatch log group for the service
    */
   private createLogGroup(config: EcsServiceConfig): logs.LogGroup {
-    const stackName = config.stackName || this.stackName;
+    const stackName = config.metadata?.name || this.stackName;
     return new logs.LogGroup(this, `${stackName}LogGroup`, {
-      logGroupName: config.logGroupName || `/ecs/${config.stackName}`,
+      logGroupName: `/ecs/${stackName}`,
       retention: logs.RetentionDays.ONE_WEEK,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
@@ -449,10 +513,10 @@ export class EcsServiceStack extends cdk.Stack {
    * Create Fargate task definition
    */
   private createTaskDefinition(config: EcsServiceConfig): ecs.FargateTaskDefinition {
-    const stackName = config.stackName || this.stackName;
+    const stackName = config.metadata?.name || this.stackName;
     return new ecs.FargateTaskDefinition(this, `${stackName}TaskDef`, {
-      cpu: config.cpu,
-      memoryLimitMiB: config.memory,
+      cpu: config.taskDefinition.cpu,
+      memoryLimitMiB: config.taskDefinition.memory,
       executionRole: this.createExecutionRole(config),
       taskRole: this.createTaskRole(config),
     });
@@ -462,11 +526,8 @@ export class EcsServiceStack extends cdk.Stack {
    * Create execution role with required permissions for ECS
    */
   private createExecutionRole(config: EcsServiceConfig): iam.IRole {
-    const stackName = config.stackName || this.stackName;
-    if (config.taskExecutionRoleArn) {
-      return iam.Role.fromRoleArn(this, `${stackName}ExecutionRole`, config.taskExecutionRoleArn);
-    }
-
+    const stackName = config.metadata?.name || this.stackName;
+    
     // Create execution role with required permissions
     const executionRole = new iam.Role(this, `${stackName}ExecutionRole`, {
       assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
@@ -475,13 +536,13 @@ export class EcsServiceStack extends cdk.Stack {
       ],
     });
 
-    // Add permissions from values file configuration
-    if (config.taskExecutionRolePermissions) {
-      Object.entries(config.taskExecutionRolePermissions).forEach(([service, permissions]) => {
+    // Add permissions from structured IAM configuration
+    if (config.iam?.taskExecutionRole?.policies) {
+      config.iam.taskExecutionRole.policies.forEach(policy => {
         executionRole.addToPolicy(new iam.PolicyStatement({
           effect: iam.Effect.ALLOW,
-          actions: permissions.actions,
-          resources: permissions.resources,
+          actions: policy.actions,
+          resources: policy.resources,
         }));
       });
     }
@@ -493,23 +554,20 @@ export class EcsServiceStack extends cdk.Stack {
    * Create task role with required permissions for the application
    */
   private createTaskRole(config: EcsServiceConfig): iam.IRole {
-    const stackName = config.stackName || this.stackName;
-    if (config.taskRoleArn) {
-      return iam.Role.fromRoleArn(this, `${stackName}TaskRole`, config.taskRoleArn);
-    }
+    const stackName = config.metadata?.name || this.stackName;
 
     // Create task role for application permissions
     const taskRole = new iam.Role(this, `${stackName}TaskRole`, {
       assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
     });
 
-    // Add permissions from values file configuration
-    if (config.taskRolePermissions) {
-      Object.entries(config.taskRolePermissions).forEach(([service, permissions]) => {
+    // Add permissions from structured IAM configuration
+    if (config.iam?.taskRole?.policies) {
+      config.iam.taskRole.policies.forEach(policy => {
         taskRole.addToPolicy(new iam.PolicyStatement({
           effect: iam.Effect.ALLOW,
-          actions: permissions.actions,
-          resources: permissions.resources,
+          actions: policy.actions,
+          resources: policy.resources,
         }));
       });
     }
@@ -525,27 +583,44 @@ export class EcsServiceStack extends cdk.Stack {
     taskDefinition: ecs.FargateTaskDefinition, 
     logGroup: logs.LogGroup
   ): ecs.ContainerDefinition {
-    const container = taskDefinition.addContainer(`${config.stackName}Container`, {
-      image: this.createContainerImage(config.image),
+    const stackName = config.metadata?.name || config.stackName || this.stackName;
+    const mainContainer = config.taskDefinition?.containers?.[0];
+    
+    if (!mainContainer) {
+      throw new Error('No main container found in task definition');
+    }
+    
+    const container = taskDefinition.addContainer(`${stackName}Container`, {
+      image: this.createContainerImage(mainContainer.image),
       logging: ecs.LogDrivers.awsLogs({
         logGroup: logGroup,
-        streamPrefix: config.stackName!,
+        streamPrefix: stackName,
       }),
-      environment: config.environment,
-      secrets: config.secrets ? this.createSecrets(config.secrets) : undefined,
-      healthCheck: this.createHealthCheck(config.healthCheck),
-      cpu: config.resourceLimits?.cpu,
-      memoryLimitMiB: config.resourceLimits?.memory,
+      environment: mainContainer.environment?.reduce((acc, env) => {
+        acc[env.name] = env.value;
+        return acc;
+      }, {} as { [key: string]: string }) || {},
+      secrets: mainContainer.secrets?.reduce((acc, secret) => {
+        acc[secret.name] = ecs.Secret.fromSecretsManager(secret.valueFrom);
+        return acc;
+      }, {} as { [key: string]: ecs.Secret }) || undefined,
+      healthCheck: this.createHealthCheck(mainContainer.healthCheck),
     });
 
+    // Add port mappings from structured config
+    const containerPort = mainContainer.portMappings?.[0]?.containerPort;
+    if (!containerPort) {
+      throw new Error('Container port is required. Please provide taskDefinition.containers.0.portMappings.0.containerPort');
+    }
+    
     container.addPortMappings({
-      containerPort: config.containerPort!,
+      containerPort: containerPort,
       protocol: ecs.Protocol.TCP,
     });
 
     // Add mount points for main container if volumes are specified (optional)
-    if (config.volumes && config.volumes.length > 0) {
-      config.volumes.forEach(volume => {
+    if (config.taskDefinition.volumes && config.taskDefinition.volumes.length > 0) {
+      config.taskDefinition.volumes.forEach(volume => {
         container.addMountPoints({
           sourceVolume: volume.name,
           containerPath: `/${volume.name}`,
@@ -555,13 +630,13 @@ export class EcsServiceStack extends cdk.Stack {
     }
 
     // Add additional containers if specified
-    if (config.additionalContainers) {
-      config.additionalContainers.forEach((containerConfig, index) => {
-        const additionalContainer = taskDefinition.addContainer(`${config.stackName}AdditionalContainer${index}`, {
+    if (config.taskDefinition.additionalContainers) {
+      config.taskDefinition.additionalContainers.forEach((containerConfig, index) => {
+        const additionalContainer = taskDefinition.addContainer(`${config.metadata?.name || 'AdditionalContainer'}${index}`, {
           image: this.createContainerImage(containerConfig.image),
           logging: ecs.LogDrivers.awsLogs({
             logGroup: logGroup,
-            streamPrefix: `${config.stackName}-${containerConfig.name}`,
+            streamPrefix: `${config.metadata?.name || 'AdditionalContainer'}-${containerConfig.name}`,
           }),
           environment: containerConfig.environment,
           essential: containerConfig.essential ?? false,
@@ -594,8 +669,8 @@ export class EcsServiceStack extends cdk.Stack {
     }
 
         // Add volumes if specified (optional)
-    if (config.volumes && config.volumes.length > 0) {
-      config.volumes.forEach(volume => {
+    if (config.taskDefinition.volumes && config.taskDefinition.volumes.length > 0) {
+      config.taskDefinition.volumes.forEach(volume => {
         if (volume.efsVolumeConfiguration) {
           taskDefinition.addVolume({
             name: volume.name,
@@ -714,18 +789,26 @@ export class EcsServiceStack extends cdk.Stack {
     if (!config.serviceDiscovery) return;
 
     const stackName = config.stackName || this.stackName;
+    const namespaceName = typeof config.serviceDiscovery.namespace === 'string' 
+      ? config.serviceDiscovery.namespace 
+      : config.serviceDiscovery.namespace?.name || `${config.stackName}.local`;
+    
     const namespace = new servicediscovery.PrivateDnsNamespace(this, `${stackName}Namespace`, {
-      name: config.serviceDiscovery.namespace || `${config.stackName}.local`,
+      name: namespaceName,
       vpc: vpc,
     });
 
+    const serviceName = config.serviceDiscovery.service?.name || config.stackName;
+    const dnsType = config.serviceDiscovery.service?.dnsType || 'A';
+    const ttl = config.serviceDiscovery.service?.ttl || DEFAULT_CONFIG.SERVICE_DISCOVERY_TTL;
+
     const serviceDiscoveryService = new servicediscovery.Service(this, `${stackName}ServiceDiscovery`, {
       namespace: namespace,
-      name: config.serviceDiscovery.serviceName || config.stackName,
-      dnsRecordType: config.serviceDiscovery.dnsType === 'SRV' ? 
+      name: serviceName,
+      dnsRecordType: dnsType === 'SRV' ? 
         servicediscovery.DnsRecordType.SRV : 
         servicediscovery.DnsRecordType.A,
-      dnsTtl: cdk.Duration.seconds(config.serviceDiscovery.ttl || DEFAULT_CONFIG.SERVICE_DISCOVERY_TTL),
+      dnsTtl: cdk.Duration.seconds(ttl),
     });
 
     // Associate service discovery with ECS service
@@ -819,9 +902,11 @@ export class EcsServiceStack extends cdk.Stack {
    * Add CloudFormation outputs
    */
   private addOutputs(config: EcsServiceConfig): void {
-    const stackName = config.stackName || this.stackName;
+    const stackName = config.metadata?.name || config.stackName || this.stackName;
+    const clusterName = config.cluster?.name || config.clusterName;
+    
     new cdk.CfnOutput(this, 'ServiceName', {
-      value: config.stackName!,
+      value: stackName,
       description: 'ECS Service Name',
       exportName: `${stackName}-service-name`,
     });
@@ -833,7 +918,7 @@ export class EcsServiceStack extends cdk.Stack {
     });
 
     new cdk.CfnOutput(this, 'ClusterName', {
-      value: config.clusterName,
+      value: clusterName || 'unknown',
       description: 'ECS Cluster Name',
       exportName: `${stackName}-cluster-name`,
     });

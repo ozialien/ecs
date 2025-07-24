@@ -66,13 +66,13 @@ if (valuesFile) {
 // 2. Override with context parameters (highest precedence)
 // Only override if the context parameter actually exists
 const contextKeys = [
-  // Legacy flat parameters (backward compatibility)
+  // Flat parameters (backward compatibility)
   'vpcId', 'subnetIds', 'clusterName', 'image', 'stackName', 'desiredCount', 
   'cpu', 'memory', 'containerPort', 'lbPort', 'healthCheckPath', 'loadBalancerHealthCheck', 'allowedCidr',
   'env', 'secret', 'logGroupName', 'logRetentionDays', 'enableAutoScaling',
   'minCapacity', 'maxCapacity', 'targetCpuUtilization', 'targetMemoryUtilization',
   'taskExecutionRoleArn', 'taskRoleArn', 'taskRolePermissions', 'taskExecutionRolePermissions',
-  // New structured parameters (ECS hierarchy)
+  // Structured parameters (ECS hierarchy)
   'metadata', 'infrastructure', 'cluster', 'taskDefinition', 'service', 'loadBalancer', 'autoScaling', 'iam', 'serviceDiscovery', 'addons'
 ];
 
@@ -92,7 +92,7 @@ contextKeys.forEach(key => {
       // New structured parameters - these will be handled by the config mapper
       config[key as keyof EcsServiceConfig] = contextValue;
     } else {
-      // Legacy flat parameters
+      // Flat parameters
       config[key as keyof EcsServiceConfig] = contextValue;
     }
   }

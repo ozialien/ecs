@@ -8,218 +8,312 @@
 import * as cdk from 'aws-cdk-lib';
 
 /**
- * Configuration interface for ECS service deployment
- * All values are provided via context parameters with sensible defaults
+ * Container port mapping
+ */
+export interface PortMapping {
+  containerPort: number;
+  hostPort?: number;
+  protocol: 'tcp' | 'udp';
+}
+
+/**
+ * Container environment variable
+ */
+export interface EnvironmentVariable {
+  name: string;
+  value: string;
+}
+
+/**
+ * Container secret
+ */
+export interface Secret {
+  name: string;
+  valueFrom: string;
+}
+
+/**
+ * Container health check
+ */
+export interface ContainerHealthCheck {
+  enabled?: boolean;
+  command?: string[];
+  interval?: cdk.Duration;
+  timeout?: cdk.Duration;
+  startPeriod?: cdk.Duration;
+  retries?: number;
+}
+
+/**
+ * Container mount point
+ */
+export interface MountPoint {
+  sourceVolume: string;
+  containerPath: string;
+  readOnly?: boolean;
+}
+
+/**
+ * Container definition
+ */
+export interface Container {
+  name: string;
+  image: string;
+  portMappings?: PortMapping[];
+  environment?: EnvironmentVariable[];
+  secrets?: Secret[];
+  healthCheck?: ContainerHealthCheck;
+  mountPoints?: MountPoint[];
+  essential?: boolean;
+  readonlyRootFilesystem?: boolean;
+  entryPoint?: string[];
+  command?: string[];
+}
+
+/**
+ * Volume configuration
+ */
+export interface Volume {
+  name: string;
+  efsVolumeConfiguration?: {
+    fileSystemId: string;
+    transitEncryption?: 'ENABLED' | 'DISABLED';
+    authorizationConfig?: {
+      accessPointId: string;
+      iam: 'ENABLED' | 'DISABLED';
+    };
+  };
+}
+
+/**
+ * Load balancer target group configuration
+ */
+export interface TargetGroup {
+  healthCheckPath?: string;
+  healthCheckPort?: number;
+  healthyHttpCodes?: string;
+  interval?: number;
+  timeout?: number;
+  healthyThresholdCount?: number;
+  unhealthyThresholdCount?: number;
+  deregistrationDelay?: number;
+  stickiness?: boolean;
+}
+
+/**
+ * Load balancer configuration
+ */
+export interface LoadBalancer {
+  type: 'APPLICATION' | 'NETWORK';
+  scheme?: 'internal' | 'internet-facing';
+  protocol?: 'HTTP' | 'HTTPS';
+  port?: number;
+  certificateArn?: string;
+  targetGroup?: TargetGroup;
+  allowedCidr?: string;
+}
+
+/**
+ * Deployment configuration
+ */
+export interface Deployment {
+  strategy?: 'ROLLING' | 'BLUE_GREEN' | 'CANARY';
+  minimumHealthyPercent?: number;
+  maximumPercent?: number;
+  healthCheckGracePeriodSeconds?: number;
+  waitForSteadyState?: boolean;
+}
+
+/**
+ * Network configuration
+ */
+export interface NetworkConfiguration {
+  assignPublicIp?: boolean;
+  securityGroups?: string[];
+}
+
+/**
+ * Service configuration
+ */
+export interface Service {
+  type: 'LOAD_BALANCED' | 'DAEMON' | 'SCHEDULED';
+  desiredCount: number;
+  deployment?: Deployment;
+  healthCheckGracePeriodSeconds?: number;
+  networkConfiguration?: NetworkConfiguration;
+}
+
+/**
+ * IAM policy
+ */
+export interface IamPolicy {
+  name: string;
+  actions: string[];
+  resources: string[];
+}
+
+/**
+ * IAM role configuration
+ */
+export interface IamRole {
+  policies: IamPolicy[];
+}
+
+/**
+ * IAM configuration
+ */
+export interface Iam {
+  taskRole?: IamRole;
+  taskExecutionRole?: IamRole;
+}
+
+/**
+ * Service discovery namespace
+ */
+export interface ServiceDiscoveryNamespace {
+  name: string;
+  type: 'private' | 'public' | 'http';
+}
+
+/**
+ * Service discovery service
+ */
+export interface ServiceDiscoveryService {
+  name: string;
+  dnsType: 'A' | 'SRV';
+  ttl?: number;
+  routingPolicy?: 'MULTIVALUE' | 'WEIGHTED';
+}
+
+/**
+ * Service discovery configuration
+ */
+export interface ServiceDiscovery {
+  enabled?: boolean;
+  namespace?: ServiceDiscoveryNamespace;
+  service?: ServiceDiscoveryService;
+}
+
+/**
+ * Auto scaling metric
+ */
+export interface AutoScalingMetric {
+  type: 'CPUUtilization' | 'MemoryUtilization';
+  target: number;
+}
+
+/**
+ * Auto scaling configuration
+ */
+export interface AutoScaling {
+  enabled?: boolean;
+  minCapacity?: number;
+  maxCapacity?: number;
+  targetCpuUtilization?: number;
+  targetMemoryUtilization?: number;
+  metrics?: AutoScalingMetric[];
+}
+
+/**
+ * ECS Cluster configuration
+ */
+export interface Cluster {
+  name: string;
+  containerInsights?: boolean;
+}
+
+/**
+ * Task Definition configuration
+ */
+export interface TaskDefinition {
+  type: 'FARGATE' | 'EC2';
+  cpu: number;
+  memory: number;
+  runtimePlatform?: {
+    cpuArchitecture: 'X86_64' | 'ARM64';
+    os: 'LINUX' | 'WINDOWS_SERVER_2019_CORE' | 'WINDOWS_SERVER_2019_FULL' | 'WINDOWS_SERVER_2022_CORE' | 'WINDOWS_SERVER_2022_FULL';
+  };
+  containers: Container[];
+  volumes?: Volume[];
+  additionalContainers?: Container[];
+}
+
+/**
+ * VPC configuration
+ */
+export interface VpcConfig {
+  id?: string;
+  createNew?: boolean;
+  subnets?: string[];
+  subnetType?: 'public' | 'private';
+}
+
+/**
+ * Security group rule
+ */
+export interface SecurityGroupRule {
+  port: number;
+  cidr: string;
+  description?: string;
+  protocol?: 'tcp' | 'udp' | 'icmp';
+}
+
+/**
+ * Security group configuration
+ */
+export interface SecurityGroup {
+  name: string;
+  rules: SecurityGroupRule[];
+}
+
+/**
+ * Infrastructure configuration
+ */
+export interface Infrastructure {
+  vpc: VpcConfig;
+  securityGroups?: SecurityGroup[];
+}
+
+/**
+ * Metadata section (like Chart.yaml)
+ */
+export interface Metadata {
+  name: string;
+  version: string;
+  description?: string;
+}
+
+/**
+ * Structured configuration interface for ECS service deployment
+ * Follows ECS object hierarchy for better organization
  */
 export interface EcsServiceConfig {
-  /** VPC ID where the ECS service will be deployed */
-  vpcId: string;
+  /** Metadata section */
+  metadata?: Metadata;
   
-  /** Subnet IDs for the ECS service (comma-separated string or array) */
-  subnetIds: string | string[];
+  /** Infrastructure configuration */
+  infrastructure: Infrastructure;
   
-  /** Availability zones for VPC import (optional) */
-  availabilityZones?: string[];
+  /** ECS Cluster configuration */
+  cluster: Cluster;
   
-  /** Security Group IDs for the ECS service (comma-separated string or array) */
-  securityGroupIds?: string | string[];
+  /** Task Definition configuration */
+  taskDefinition: TaskDefinition;
   
-  /** ECS cluster name where the service will be deployed */
-  clusterName: string;
+  /** Service configuration */
+  service: Service;
   
-  /** Container image URI or path to Containerfile */
-  image: string;
+  /** Load balancer configuration */
+  loadBalancer: LoadBalancer;
   
-  /** Stack name (required) */
-  stackName: string;
+  /** Auto scaling configuration */
+  autoScaling?: AutoScaling;
   
-  /** Number of tasks to run (default: 1) */
-  desiredCount?: number;
-  
-  /** CPU units for the task (default: 256) */
-  cpu?: number;
-  
-  /** Memory in MiB for the task (default: 512) */
-  memory?: number;
-  
-  /** Container resource limits */
-  resourceLimits?: {
-    enabled?: boolean;
-    cpu?: number;
-    memory?: number;
-  };
-  
-  /** Port that the container exposes */
-  containerPort?: number;
-  
-  /** Load balancer port */
-  lbPort?: number;
-  
-  /** Health check path (default: '/') */
-  healthCheckPath?: string;
-  
-  /** Load balancer health check configuration */
-  loadBalancerHealthCheck?: {
-    enabled?: boolean;
-    path?: string;
-    healthyHttpCodes?: string;
-    interval?: cdk.Duration;
-    timeout?: cdk.Duration;
-    healthyThresholdCount?: number;
-    unhealthyThresholdCount?: number;
-  };
-  
-  /** Container health check configuration */
-  healthCheck?: {
-    enabled?: boolean;
-    command?: string[];
-    interval?: cdk.Duration;
-    timeout?: cdk.Duration;
-    startPeriod?: cdk.Duration;
-    retries?: number;
-  };
-  
-  /** Allowed CIDR for ALB security group (default: '0.0.0.0/0') */
-  allowedCidr?: string;
-  
-  /** Environment variables for the container */
-  environment?: { [key: string]: string };
-  
-  /** Secrets for the container */
-  secrets?: { [key: string]: string };
-  
-  /** Log group name (defaults to service name) */
-  logGroupName?: string;
-  
-  /** Log retention days (default: 7) */
-  logRetentionDays?: number;
-  
-  /** Whether to enable auto scaling (default: false) */
-  enableAutoScaling?: boolean;
-  
-  /** Minimum capacity for auto scaling (default: 1) */
-  minCapacity?: number;
-  
-  /** Maximum capacity for auto scaling (default: 10) */
-  maxCapacity?: number;
-  
-  /** Target CPU utilization for auto scaling (default: 70) */
-  targetCpuUtilization?: number;
-  
-  /** Target memory utilization for auto scaling (default: 70) */
-  targetMemoryUtilization?: number;
-  
-  /** Task execution role ARN (optional) */
-  taskExecutionRoleArn?: string;
-  
-  /** Task role ARN (optional) */
-  taskRoleArn?: string;
-  
-  /** Values file path for loading configuration from file */
-  valuesFile?: string;
-
-  /** IAM permissions for task role */
-  taskRolePermissions?: {
-    [service: string]: {
-      actions: string[];
-      resources: string[];
-    };
-  };
-
-  /** IAM permissions for task execution role */
-  taskExecutionRolePermissions?: {
-    [service: string]: {
-      actions: string[];
-      resources: string[];
-    };
-  };
+  /** IAM configuration */
+  iam?: Iam;
   
   /** Service discovery configuration */
-  serviceDiscovery?: {
-    enabled?: boolean;
-    namespace?: string;
-    serviceName?: string;
-    dnsType?: 'A' | 'SRV';
-    ttl?: number;
-  };
-  
-  /** Capacity provider configuration */
-  capacityProvider?: 'FARGATE' | 'FARGATE_SPOT';
-  
-  /** Graceful shutdown configuration */
-  gracefulShutdown?: {
-    enabled?: boolean;
-    stopTimeout?: cdk.Duration;
-    drainTimeout?: cdk.Duration;
-  };
-  
-  /** Task placement strategies */
-  placementStrategies?: {
-    enabled?: boolean;
-    type: 'spread' | 'binpack' | 'random';
-    field?: string;
-    value?: string;
-  }[];
-  
-  /** Whether the load balancer should be public (default: true) */
-  publicLoadBalancer?: boolean;
-  
-  /** ECR registry domain */
-  registryDomain?: string;
-  
-  /** ECR repository name */
-  repositoryName?: string;
-  
-  /** ECR image tag */
-  tag?: string;
-
-  /** SSL certificate ARN for HTTPS load balancer */
-  certificateArn?: string;
-
-  /** Load balancer protocol (HTTP or HTTPS) */
-  lbProtocol?: 'HTTP' | 'HTTPS';
-
-  /** Additional containers to run alongside main container */
-  additionalContainers?: {
-    name: string;
-    image: string;
-    essential?: boolean;
-    readonlyRootFilesystem?: boolean;
-    environment?: { [key: string]: string };
-    command?: string[];
-    entryPoint?: string[];
-    portMappings?: {
-      containerPort: number;
-      protocol?: 'tcp' | 'udp';
-    }[];
-    mountPoints?: {
-      sourceVolume: string;
-      containerPath: string;
-      readOnly?: boolean;
-    }[];
-  }[];
-
-  /** Volume configurations */
-  volumes?: {
-    name: string;
-    efsVolumeConfiguration?: {
-      fileSystemId: string;
-      transitEncryption?: 'ENABLED' | 'DISABLED';
-      authorizationConfig?: {
-        accessPointId: string;
-        iam: 'ENABLED' | 'DISABLED';
-      };
-    };
-  }[];
-
-  /** Health check grace period in seconds */
-  healthCheckGracePeriodSeconds?: number;
-
-  /** Deployment configuration */
-  deploymentConfiguration?: {
-    minimumHealthyPercent?: number;
-    maximumPercent?: number;
-  };
+  serviceDiscovery?: ServiceDiscovery;
 }
 
 /**
