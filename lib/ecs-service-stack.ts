@@ -31,6 +31,7 @@ import * as path from 'path';
 import { Construct } from 'constructs';
 import { EcsServiceConfig, EcsServiceStackProps } from './types';
 import { showHelp } from './help';
+import { ConfigMapper } from './config-mapper';
 
 /**
  * Default configuration values
@@ -165,6 +166,7 @@ export class EcsServiceStack extends cdk.Stack {
   private loadConfiguration(): EcsServiceConfig {
     const testConfig = this.stackProps?.config || {};
     
+    // Start with legacy format configuration
     const config: EcsServiceConfig = {
       // Required parameters
       vpcId: this.getContextValue('vpcId', testConfig.vpcId) ?? this.requireContext('vpcId'),
@@ -201,7 +203,17 @@ export class EcsServiceStack extends cdk.Stack {
     // Load from values file if specified
     if (config.valuesFile) {
       const values = this.loadValuesFile(config.valuesFile);
-      Object.assign(config, values);
+      
+      // Check if the loaded values are in structured format
+      if (ConfigMapper.isStructuredConfig(values)) {
+        console.log('📋 Detected structured configuration format, converting to legacy format...');
+        const structuredConfig = values;
+        const legacyConfig = ConfigMapper.structuredToLegacy(structuredConfig);
+        Object.assign(config, legacyConfig);
+      } else {
+        // Legacy format - merge directly
+        Object.assign(config, values);
+      }
     }
 
     // Parse environment variables and secrets
