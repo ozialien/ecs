@@ -870,11 +870,15 @@ export class EcsServiceStack extends cdk.Stack {
     const useHttps = protocol === 'HTTPS' && certificate;
     const listenerPort = useHttps ? (config.loadBalancer.port || 443) : (config.loadBalancer.port || 80);
 
+    // Determine load balancer scheme - default to internet-facing if not specified
+    const scheme = config.loadBalancer.scheme || 'internet-facing';
+    const publicLoadBalancer = scheme === 'internet-facing';
+
     const service = new ecs_patterns.ApplicationLoadBalancedFargateService(this, `${stackName}Service`, {
       cluster: this.cluster,
       taskDefinition: taskDefinition,
       desiredCount: config.service.desiredCount,
-      publicLoadBalancer: true, // Default to true
+      publicLoadBalancer: publicLoadBalancer,
       listenerPort: listenerPort,
       protocol: useHttps ? elbv2.ApplicationProtocol.HTTPS : elbv2.ApplicationProtocol.HTTP,
       certificate: certificate,
