@@ -31,7 +31,6 @@ import * as path from 'path';
 import { Construct } from 'constructs';
 import { EcsServiceConfig, EcsServiceStackProps, ContainerHealthCheck } from './types';
 import { showHelp } from './help';
-import { ConfigMapper } from './config-mapper';
 
 /**
  * Default configuration values
@@ -176,79 +175,80 @@ export class EcsServiceStack extends cdk.Stack {
   private loadConfiguration(): EcsServiceConfig {
     const testConfig = this.stackProps?.config || {};
     
+    // Load values file if specified
+    const valuesFile = testConfig.valuesFile ? this.loadValuesFile(testConfig.valuesFile as string) : {};
+    
     // Start with structured configuration
     const config: EcsServiceConfig = {
-      // Load from values file if specified
-      ...(testConfig.valuesFile && this.loadValuesFile(testConfig.valuesFile as string)),
-      
       // Load from context parameters for structured config
       metadata: {
-        name: this.getContextValue('metadata.name', testConfig.metadata?.name) ?? this.stackName,
-        version: this.getContextValue('metadata.version', testConfig.metadata?.version) ?? '1.0.0',
-        description: this.getContextValue('metadata.description', testConfig.metadata?.description),
+        name: this.getContextValue('metadata.name', valuesFile.metadata?.name || testConfig.metadata?.name) ?? this.stackName,
+        version: this.getContextValue('metadata.version', valuesFile.metadata?.version || testConfig.metadata?.version) ?? '1.0.0',
+        description: this.getContextValue('metadata.description', valuesFile.metadata?.description || testConfig.metadata?.description),
       },
       
       infrastructure: {
         vpc: {
-          id: this.getContextValue('infrastructure.vpc.id', testConfig.infrastructure?.vpc?.id) ?? this.requireContext('infrastructure.vpc.id'),
-          subnets: this.parseSubnetIds(this.getContextValue('infrastructure.vpc.subnets', testConfig.infrastructure?.vpc?.subnets)) ?? [],
+          id: this.getContextValue('infrastructure.vpc.id', valuesFile.infrastructure?.vpc?.id || testConfig.infrastructure?.vpc?.id) ?? this.requireContext('infrastructure.vpc.id'),
+          subnets: this.parseSubnetIds(this.getContextValue('infrastructure.vpc.subnets', valuesFile.infrastructure?.vpc?.subnets || testConfig.infrastructure?.vpc?.subnets)) ?? [],
         },
-        securityGroups: testConfig.infrastructure?.securityGroups,
+        securityGroups: valuesFile.infrastructure?.securityGroups || testConfig.infrastructure?.securityGroups,
       },
       
       cluster: {
-        name: this.getContextValue('cluster.name', testConfig.cluster?.name) ?? this.requireContext('cluster.name'),
-        containerInsights: this.getBooleanContextValue('cluster.containerInsights', testConfig.cluster?.containerInsights) ?? true,
+        name: this.getContextValue('cluster.name', valuesFile.cluster?.name || testConfig.cluster?.name) ?? this.requireContext('cluster.name'),
+        containerInsights: this.getBooleanContextValue('cluster.containerInsights', valuesFile.cluster?.containerInsights || testConfig.cluster?.containerInsights) ?? true,
       },
       
       taskDefinition: {
-        type: this.getContextValue('taskDefinition.type', testConfig.taskDefinition?.type) ?? 'FARGATE',
-        cpu: this.getNumericContextValue('taskDefinition.cpu', testConfig.taskDefinition?.cpu) ?? DEFAULT_CONFIG.CPU,
-        memory: this.getNumericContextValue('taskDefinition.memory', testConfig.taskDefinition?.memory) ?? DEFAULT_CONFIG.MEMORY,
+        type: this.getContextValue('taskDefinition.type', valuesFile.taskDefinition?.type || testConfig.taskDefinition?.type) ?? 'FARGATE',
+        cpu: this.getNumericContextValue('taskDefinition.cpu', valuesFile.taskDefinition?.cpu || testConfig.taskDefinition?.cpu) ?? DEFAULT_CONFIG.CPU,
+        memory: this.getNumericContextValue('taskDefinition.memory', valuesFile.taskDefinition?.memory || testConfig.taskDefinition?.memory) ?? DEFAULT_CONFIG.MEMORY,
         containers: [{
           name: 'main',
-          image: this.getContextValue('taskDefinition.containers.0.image', testConfig.taskDefinition?.containers?.[0]?.image) ?? this.requireContext('taskDefinition.containers.0.image'),
+          image: this.getContextValue('taskDefinition.containers.0.image', valuesFile.taskDefinition?.containers?.[0]?.image || testConfig.taskDefinition?.containers?.[0]?.image) ?? this.requireContext('taskDefinition.containers.0.image'),
           portMappings: [{
-            containerPort: this.getNumericContextValue('taskDefinition.containers.0.portMappings.0.containerPort', testConfig.taskDefinition?.containers?.[0]?.portMappings?.[0]?.containerPort) ?? this.requireContext('taskDefinition.containers.0.portMappings.0.containerPort'),
+            containerPort: this.getNumericContextValue('taskDefinition.containers.0.portMappings.0.containerPort', valuesFile.taskDefinition?.containers?.[0]?.portMappings?.[0]?.containerPort || testConfig.taskDefinition?.containers?.[0]?.portMappings?.[0]?.containerPort) ?? this.requireContext('taskDefinition.containers.0.portMappings.0.containerPort'),
             protocol: 'tcp',
           }],
-          environment: testConfig.taskDefinition?.containers?.[0]?.environment || this.parseEnvironmentVariablesAsArray(),
-          secrets: testConfig.taskDefinition?.containers?.[0]?.secrets || this.parseSecretsAsArray(),
+          environment: valuesFile.taskDefinition?.containers?.[0]?.environment || testConfig.taskDefinition?.containers?.[0]?.environment || this.parseEnvironmentVariablesAsArray(),
+          secrets: valuesFile.taskDefinition?.containers?.[0]?.secrets || testConfig.taskDefinition?.containers?.[0]?.secrets || this.parseSecretsAsArray(),
         }],
-        volumes: testConfig.taskDefinition?.volumes,
+        volumes: valuesFile.taskDefinition?.volumes || testConfig.taskDefinition?.volumes,
       },
       
       service: {
-        type: this.getContextValue('service.type', testConfig.service?.type) ?? 'LOAD_BALANCED',
-        desiredCount: this.getNumericContextValue('service.desiredCount', testConfig.service?.desiredCount) ?? DEFAULT_CONFIG.DESIRED_COUNT,
-        healthCheckGracePeriodSeconds: this.getNumericContextValue('service.healthCheckGracePeriodSeconds', testConfig.service?.healthCheckGracePeriodSeconds),
+        type: this.getContextValue('service.type', valuesFile.service?.type || testConfig.service?.type) ?? 'LOAD_BALANCED',
+        desiredCount: this.getNumericContextValue('service.desiredCount', valuesFile.service?.desiredCount || testConfig.service?.desiredCount) ?? DEFAULT_CONFIG.DESIRED_COUNT,
+        healthCheckGracePeriodSeconds: this.getNumericContextValue('service.healthCheckGracePeriodSeconds', valuesFile.service?.healthCheckGracePeriodSeconds || testConfig.service?.healthCheckGracePeriodSeconds),
       },
       
       loadBalancer: {
-        type: this.getContextValue('loadBalancer.type', testConfig.loadBalancer?.type) ?? 'APPLICATION',
-        protocol: this.getContextValue('loadBalancer.protocol', testConfig.loadBalancer?.protocol) ?? 'HTTP',
-        port: this.getNumericContextValue('loadBalancer.port', testConfig.loadBalancer?.port) ?? this.requireContext('loadBalancer.port'),
-        certificateArn: this.getContextValue('loadBalancer.certificateArn', testConfig.loadBalancer?.certificateArn),
+        type: this.getContextValue('loadBalancer.type', valuesFile.loadBalancer?.type || testConfig.loadBalancer?.type) ?? 'APPLICATION',
+        protocol: this.getContextValue('loadBalancer.protocol', valuesFile.loadBalancer?.protocol || testConfig.loadBalancer?.protocol) ?? 'HTTP',
+        port: this.getNumericContextValue('loadBalancer.port', valuesFile.loadBalancer?.port || testConfig.loadBalancer?.port) ?? this.requireContext('loadBalancer.port'),
+        certificateArn: this.getContextValue('loadBalancer.certificateArn', valuesFile.loadBalancer?.certificateArn || testConfig.loadBalancer?.certificateArn),
         targetGroup: {
-          healthCheckPath: this.getContextValue('loadBalancer.targetGroup.healthCheckPath', testConfig.loadBalancer?.targetGroup?.healthCheckPath) ?? DEFAULT_CONFIG.HEALTH_CHECK_PATH,
+          healthCheckPath: this.getContextValue('loadBalancer.targetGroup.healthCheckPath', valuesFile.loadBalancer?.targetGroup?.healthCheckPath || testConfig.loadBalancer?.targetGroup?.healthCheckPath) ?? DEFAULT_CONFIG.HEALTH_CHECK_PATH,
         },
-        allowedCidr: this.getContextValue('loadBalancer.allowedCidr', testConfig.loadBalancer?.allowedCidr),
+        allowedCidr: this.getContextValue('loadBalancer.allowedCidr', valuesFile.loadBalancer?.allowedCidr || testConfig.loadBalancer?.allowedCidr),
       },
       
       autoScaling: {
-        enabled: this.getBooleanContextValue('autoScaling.enabled', testConfig.autoScaling?.enabled) ?? DEFAULT_CONFIG.ENABLE_AUTO_SCALING,
-        minCapacity: this.getNumericContextValue('autoScaling.minCapacity', testConfig.autoScaling?.minCapacity) ?? DEFAULT_CONFIG.MIN_CAPACITY,
-        maxCapacity: this.getNumericContextValue('autoScaling.maxCapacity', testConfig.autoScaling?.maxCapacity) ?? DEFAULT_CONFIG.MAX_CAPACITY,
-        targetCpuUtilization: this.getNumericContextValue('autoScaling.targetCpuUtilization', testConfig.autoScaling?.targetCpuUtilization) ?? DEFAULT_CONFIG.TARGET_CPU_UTILIZATION,
-        targetMemoryUtilization: this.getNumericContextValue('autoScaling.targetMemoryUtilization', testConfig.autoScaling?.targetMemoryUtilization) ?? DEFAULT_CONFIG.TARGET_MEMORY_UTILIZATION,
+        enabled: this.getBooleanContextValue('autoScaling.enabled', valuesFile.autoScaling?.enabled || testConfig.autoScaling?.enabled) ?? DEFAULT_CONFIG.ENABLE_AUTO_SCALING,
+        minCapacity: this.getNumericContextValue('autoScaling.minCapacity', valuesFile.autoScaling?.minCapacity || testConfig.autoScaling?.minCapacity) ?? DEFAULT_CONFIG.MIN_CAPACITY,
+        maxCapacity: this.getNumericContextValue('autoScaling.maxCapacity', valuesFile.autoScaling?.maxCapacity || testConfig.autoScaling?.maxCapacity) ?? DEFAULT_CONFIG.MAX_CAPACITY,
+        targetCpuUtilization: this.getNumericContextValue('autoScaling.targetCpuUtilization', valuesFile.autoScaling?.targetCpuUtilization || testConfig.autoScaling?.targetCpuUtilization) ?? DEFAULT_CONFIG.TARGET_CPU_UTILIZATION,
+        targetMemoryUtilization: this.getNumericContextValue('autoScaling.targetMemoryUtilization', valuesFile.autoScaling?.targetMemoryUtilization || testConfig.autoScaling?.targetMemoryUtilization) ?? DEFAULT_CONFIG.TARGET_MEMORY_UTILIZATION,
       },
       
       iam: {
-        taskRole: testConfig.iam?.taskRole,
-        taskExecutionRole: testConfig.iam?.taskExecutionRole,
-
+        taskRole: valuesFile.iam?.taskRole || testConfig.iam?.taskRole,
+        taskExecutionRole: valuesFile.iam?.taskExecutionRole || testConfig.iam?.taskExecutionRole,
       },
-      serviceDiscovery: testConfig.serviceDiscovery,
+      serviceDiscovery: valuesFile.serviceDiscovery || testConfig.serviceDiscovery,
+      
+      addons: valuesFile.addons || testConfig.addons,
 
     };
 
@@ -359,23 +359,7 @@ export class EcsServiceStack extends cdk.Stack {
     return Object.entries(secrets).map(([name, valueFrom]) => ({ name, valueFrom }));
   }
 
-  private parseEnvironmentVariablesAsArrayFromLegacy(legacyEnv?: { [key: string]: string }): { name: string; value: string }[] {
-    if (!legacyEnv) return [];
-    
-    return Object.entries(legacyEnv).map(([name, value]) => ({
-      name,
-      value,
-    }));
-  }
 
-  private parseSecretsAsArrayFromLegacy(legacySecrets?: { [key: string]: string }): { name: string; valueFrom: string }[] {
-    if (!legacySecrets) return [];
-    
-    return Object.entries(legacySecrets).map(([name, valueFrom]) => ({
-      name,
-      valueFrom,
-    }));
-  }
 
   /**
    * Load configuration from values file (JSON, YAML, JS)
@@ -502,9 +486,14 @@ export class EcsServiceStack extends cdk.Stack {
    */
   private createLogGroup(config: EcsServiceConfig): logs.LogGroup {
     const stackName = config.metadata?.name || this.stackName;
+    
+    // Use add-ons configuration if available, otherwise use defaults
+    const logGroupName = config.addons?.logging?.options?.['awslogs-group'] || `/ecs/${stackName}`;
+    const retentionDays = config.addons?.logging?.retentionDays || DEFAULT_CONFIG.LOG_RETENTION_DAYS;
+    
     return new logs.LogGroup(this, `${stackName}LogGroup`, {
-      logGroupName: `/ecs/${stackName}`,
-      retention: logs.RetentionDays.ONE_WEEK,
+      logGroupName: logGroupName,
+      retention: this.convertRetentionDays(retentionDays),
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
   }
@@ -514,11 +503,19 @@ export class EcsServiceStack extends cdk.Stack {
    */
   private createTaskDefinition(config: EcsServiceConfig): ecs.FargateTaskDefinition {
     const stackName = config.metadata?.name || this.stackName;
+    
+    // Create runtime platform if specified
+    const runtimePlatform = config.taskDefinition.runtimePlatform ? {
+      cpuArchitecture: ecs.CpuArchitecture.of(config.taskDefinition.runtimePlatform.cpuArchitecture),
+      operatingSystemFamily: ecs.OperatingSystemFamily.of(config.taskDefinition.runtimePlatform.os),
+    } : undefined;
+
     return new ecs.FargateTaskDefinition(this, `${stackName}TaskDef`, {
       cpu: config.taskDefinition.cpu,
       memoryLimitMiB: config.taskDefinition.memory,
       executionRole: this.createExecutionRole(config),
       taskRole: this.createTaskRole(config),
+      runtimePlatform,
     });
   }
 
@@ -536,6 +533,16 @@ export class EcsServiceStack extends cdk.Stack {
       ],
     });
 
+    // Add custom JSON policy if provided
+    if (config.iam?.taskExecutionRole?.custom) {
+      try {
+        const customPolicy = JSON.parse(config.iam.taskExecutionRole.custom);
+        executionRole.addToPolicy(new iam.PolicyStatement(customPolicy));
+      } catch (error) {
+        console.warn(`⚠️  Warning: Invalid custom policy JSON for execution role: ${error}`);
+      }
+    }
+
     // Add permissions from structured IAM configuration
     if (config.iam?.taskExecutionRole?.policies) {
       config.iam.taskExecutionRole.policies.forEach(policy => {
@@ -545,6 +552,11 @@ export class EcsServiceStack extends cdk.Stack {
           resources: policy.resources,
         }));
       });
+    }
+
+    // Add detailed permissions if specified
+    if (config.iam?.taskExecutionRole?.permissions) {
+      this.addDetailedPermissions(executionRole, config.iam.taskExecutionRole.permissions);
     }
 
     return executionRole;
@@ -561,6 +573,16 @@ export class EcsServiceStack extends cdk.Stack {
       assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
     });
 
+    // Add custom JSON policy if provided
+    if (config.iam?.taskRole?.custom) {
+      try {
+        const customPolicy = JSON.parse(config.iam.taskRole.custom);
+        taskRole.addToPolicy(new iam.PolicyStatement(customPolicy));
+      } catch (error) {
+        console.warn(`⚠️  Warning: Invalid custom policy JSON for task role: ${error}`);
+      }
+    }
+
     // Add permissions from structured IAM configuration
     if (config.iam?.taskRole?.policies) {
       config.iam.taskRole.policies.forEach(policy => {
@@ -572,7 +594,116 @@ export class EcsServiceStack extends cdk.Stack {
       });
     }
 
+    // Add detailed permissions if specified
+    if (config.iam?.taskRole?.permissions) {
+      this.addDetailedPermissions(taskRole, config.iam.taskRole.permissions);
+    }
+
     return taskRole;
+  }
+
+  /**
+   * Add detailed IAM permissions to a role
+   */
+  private addDetailedPermissions(role: iam.Role, permissions: any): void {
+    // Secrets Manager permissions
+    if (permissions.secretsManager) {
+      role.addToPolicy(new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: permissions.secretsManager.actions,
+        resources: permissions.secretsManager.resources,
+      }));
+    }
+
+    // CloudWatch Logs permissions
+    if (permissions.cloudWatchLogs) {
+      role.addToPolicy(new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: permissions.cloudWatchLogs.actions,
+        resources: permissions.cloudWatchLogs.resources,
+      }));
+    }
+
+    // KMS permissions
+    if (permissions.kms) {
+      role.addToPolicy(new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: permissions.kms.actions,
+        resources: permissions.kms.resources,
+      }));
+    }
+
+    // STS permissions
+    if (permissions.sts) {
+      role.addToPolicy(new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: permissions.sts.actions,
+        resources: permissions.sts.resources,
+      }));
+    }
+
+    // S3 permissions
+    if (permissions.s3) {
+      role.addToPolicy(new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: permissions.s3.actions,
+        resources: permissions.s3.resources,
+      }));
+    }
+
+    // SQS permissions
+    if (permissions.sqs) {
+      role.addToPolicy(new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: permissions.sqs.actions,
+        resources: permissions.sqs.resources,
+      }));
+    }
+
+    // DynamoDB permissions
+    if (permissions.dynamodb) {
+      role.addToPolicy(new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: permissions.dynamodb.actions,
+        resources: permissions.dynamodb.resources,
+      }));
+    }
+
+    // RDS permissions
+    if (permissions.rds) {
+      role.addToPolicy(new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: permissions.rds.actions,
+        resources: permissions.rds.resources,
+      }));
+    }
+
+    // CloudWatch Metrics permissions
+    if (permissions.cloudWatchMetrics) {
+      role.addToPolicy(new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: permissions.cloudWatchMetrics.actions,
+        resources: permissions.cloudWatchMetrics.resources,
+      }));
+    }
+
+    // ECR permissions
+    if (permissions.ecr) {
+      role.addToPolicy(new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: permissions.ecr.actions,
+        resources: permissions.ecr.resources,
+      }));
+    }
+
+    // SSM permissions
+    if (permissions.ssm) {
+      role.addToPolicy(new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: permissions.ssm.actions,
+        resources: permissions.ssm.resources,
+      }));
+    }
   }
 
   /**
@@ -754,17 +885,24 @@ export class EcsServiceStack extends cdk.Stack {
     });
 
     // Configure health check on the target group
-    if (config.loadBalancer.targetGroup?.healthCheckPath) {
+    if (config.loadBalancer.targetGroup?.healthCheckPath || config.loadBalancer.targetGroup?.healthCheck) {
       const targetGroup = service.targetGroup;
+      const healthCheck = config.loadBalancer.targetGroup.healthCheck;
       
-      targetGroup.configureHealthCheck({
-        path: config.loadBalancer.targetGroup.healthCheckPath || '/',
-        healthyHttpCodes: '200',
-        interval: cdk.Duration.seconds(30),
-        timeout: cdk.Duration.seconds(5),
-        healthyThresholdCount: 2,
-        unhealthyThresholdCount: 3,
-      });
+      // Use advanced health check configuration if available, otherwise use basic
+      const healthCheckConfig = {
+        path: healthCheck?.path || config.loadBalancer.targetGroup.healthCheckPath || '/',
+        healthyHttpCodes: healthCheck?.healthyHttpCodes || '200',
+        interval: this.convertToDuration(healthCheck?.interval || config.loadBalancer.targetGroup.interval || 30),
+        timeout: this.convertToDuration(healthCheck?.timeout || config.loadBalancer.targetGroup.timeout || 5),
+        healthyThresholdCount: healthCheck?.healthyThresholdCount || config.loadBalancer.targetGroup.healthyThresholdCount || 2,
+        unhealthyThresholdCount: healthCheck?.unhealthyThresholdCount || config.loadBalancer.targetGroup.unhealthyThresholdCount || 3,
+      };
+      
+      // Only configure if health check is enabled or not explicitly disabled
+      if (healthCheck?.enabled !== false) {
+        targetGroup.configureHealthCheck(healthCheckConfig);
+      }
     }
 
     return service;
@@ -937,6 +1075,32 @@ export class EcsServiceStack extends cdk.Stack {
     if (value instanceof cdk.Duration) return value;
     if (typeof value === 'number') return cdk.Duration.seconds(value);
     return undefined;
+  }
+
+  /**
+   * Convert retention days to CDK RetentionDays enum
+   */
+  private convertRetentionDays(days: number): logs.RetentionDays {
+    switch (days) {
+      case 1: return logs.RetentionDays.ONE_DAY;
+      case 3: return logs.RetentionDays.THREE_DAYS;
+      case 5: return logs.RetentionDays.FIVE_DAYS;
+      case 7: return logs.RetentionDays.ONE_WEEK;
+      case 14: return logs.RetentionDays.TWO_WEEKS;
+      case 30: return logs.RetentionDays.ONE_MONTH;
+      case 60: return logs.RetentionDays.TWO_MONTHS;
+      case 90: return logs.RetentionDays.THREE_MONTHS;
+      case 120: return logs.RetentionDays.FOUR_MONTHS;
+      case 150: return logs.RetentionDays.FIVE_MONTHS;
+      case 180: return logs.RetentionDays.SIX_MONTHS;
+      case 365: return logs.RetentionDays.ONE_YEAR;
+      case 400: return logs.RetentionDays.THIRTEEN_MONTHS;
+      case 545: return logs.RetentionDays.EIGHTEEN_MONTHS;
+      case 731: return logs.RetentionDays.TWO_YEARS;
+      case 1827: return logs.RetentionDays.FIVE_YEARS;
+      case 3653: return logs.RetentionDays.TEN_YEARS;
+      default: return logs.RetentionDays.ONE_WEEK;
+    }
   }
 
   /**

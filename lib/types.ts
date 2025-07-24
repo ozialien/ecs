@@ -86,6 +86,20 @@ export interface Volume {
 }
 
 /**
+ * Load balancer health check configuration
+ */
+export interface HealthCheck {
+  enabled?: boolean;
+  path?: string;
+  port?: number;
+  healthyHttpCodes?: string;
+  interval?: number;
+  timeout?: number;
+  healthyThresholdCount?: number;
+  unhealthyThresholdCount?: number;
+}
+
+/**
  * Load balancer target group configuration
  */
 export interface TargetGroup {
@@ -98,6 +112,7 @@ export interface TargetGroup {
   unhealthyThresholdCount?: number;
   deregistrationDelay?: number;
   stickiness?: boolean;
+  healthCheck?: HealthCheck;
 }
 
 /**
@@ -153,10 +168,62 @@ export interface IamPolicy {
 }
 
 /**
+ * Detailed IAM permissions
+ */
+export interface IamPermissions {
+  secretsManager?: {
+    actions: string[];
+    resources: string[];
+  };
+  cloudWatchLogs?: {
+    actions: string[];
+    resources: string[];
+  };
+  kms?: {
+    actions: string[];
+    resources: string[];
+  };
+  sts?: {
+    actions: string[];
+    resources: string[];
+  };
+  s3?: {
+    actions: string[];
+    resources: string[];
+  };
+  sqs?: {
+    actions: string[];
+    resources: string[];
+  };
+  dynamodb?: {
+    actions: string[];
+    resources: string[];
+  };
+  rds?: {
+    actions: string[];
+    resources: string[];
+  };
+  cloudWatchMetrics?: {
+    actions: string[];
+    resources: string[];
+  };
+  ecr?: {
+    actions: string[];
+    resources: string[];
+  };
+  ssm?: {
+    actions: string[];
+    resources: string[];
+  };
+}
+
+/**
  * IAM role configuration
  */
 export interface IamRole {
-  policies: IamPolicy[];
+  policies?: IamPolicy[];
+  permissions?: IamPermissions;
+  custom?: string; // JSON policy string
 }
 
 /**
@@ -192,6 +259,31 @@ export interface ServiceDiscovery {
   enabled?: boolean;
   namespace?: ServiceDiscoveryNamespace;
   service?: ServiceDiscoveryService;
+}
+
+/**
+ * Logging configuration
+ */
+export interface Logging {
+  driver: 'awslogs' | 'fluentd' | 'gelf' | 'journald' | 'json-file' | 'logentries' | 'splunk' | 'syslog';
+  options?: { [key: string]: string };
+  retentionDays?: number;
+}
+
+/**
+ * Monitoring configuration
+ */
+export interface Monitoring {
+  enableXRay?: boolean;
+  enableCloudWatchAlarms?: boolean;
+}
+
+/**
+ * Add-ons configuration
+ */
+export interface Addons {
+  logging?: Logging;
+  monitoring?: Monitoring;
 }
 
 /**
@@ -314,6 +406,9 @@ export interface EcsServiceConfig {
   
   /** Service discovery configuration */
   serviceDiscovery?: ServiceDiscovery;
+  
+  /** Add-ons configuration */
+  addons?: Addons;
   
   /** Values file path for loading configuration */
   valuesFile?: string;
