@@ -545,3 +545,62 @@ Create a cdk deployment tool for deploying ecs environments.
 - **Lesson**: When changing CLI interfaces, must update ALL related components: tests, examples, documentation
 - **Requirement**: Always test as you go and ensure all components are consistent
 - **Follow-up**: All values file usage now consistently uses `-c valuesFile=` format
+
+#### 30. ECS Object Hierarchy - Structure Design Requirement
+- **Requirement**: Values file structure MUST follow actual ECS object hierarchy
+- **Issue**: Initial design didn't properly reflect ECS object relationships
+- **ECS Object Hierarchy**:
+  1. **ECS Cluster** - Contains services
+  2. **ECS Service** - Contains task definitions and load balancer
+  3. **Task Definition** - Contains containers and volumes (CPU/memory here)
+  4. **Container Definition** - Contains image, ports, environment, secrets
+  5. **Load Balancer** - Contains target group
+  6. **Target Group** - Contains health checks
+  7. **Auto Scaling** - Attached to service (separate from service config)
+  8. **IAM Roles** - Task role and execution role (separate entities)
+  9. **Security Groups** - Network security (infrastructure level)
+  10. **CloudWatch Logs** - Logging configuration (add-ons)
+- **Correct Structure**:
+  ```yaml
+  # --- ECS Cluster ---
+  cluster:
+    name: "my-cluster"
+    containerInsights: true
+  
+  # --- Task Definition ---
+  taskDefinition:
+    type: "FARGATE"
+    cpu: 1024
+    memory: 2048
+    containers:
+      - name: "app"
+        image: "nginx:alpine"
+        portMappings:
+          - containerPort: 80
+  
+  # --- ECS Service ---
+  service:
+    type: "LOAD_BALANCED"
+    desiredCount: 2
+  
+  # --- Load Balancer ---
+  loadBalancer:
+    type: "APPLICATION"
+    targetGroup:
+      healthCheckPath: "/health"
+  
+  # --- Auto Scaling ---
+  autoScaling:
+    enabled: true
+    minCapacity: 2
+    maxCapacity: 10
+  ```
+- **Key Insights**:
+  - Task Definition contains CPU/memory (not separate "compute")
+  - Containers belong to Task Definition (not separate)
+  - Load Balancer is separate from Service
+  - Auto Scaling is separate from Service
+  - IAM roles are separate entities
+- **Lesson**: Always map to actual AWS resource hierarchy, not logical grouping
+- **Requirement**: Structure must reflect how CDK constructs ECS resources
+- **Follow-up**: All examples updated to follow ECS object hierarchy

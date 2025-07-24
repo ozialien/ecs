@@ -1,212 +1,258 @@
 # values-matsonlabs.yaml for cas-erd-svc deployment (Private IP Only)
+# Usage: cdk deploy -c valuesFile=examples/values-matsonlabs.yaml
 # Values extracted from matsonlabs environment in cdk.json
 # IAM permissions based on existing CDK stack implementation
 
-# Infrastructure configuration
-vpcId: vpc-42de9927
-subnetIds: subnet-103d3874,subnet-c56802b2
-securityGroupIds: sg-0a97935f67ae5717e
-clusterName: cas-erd-svc-cluster
+# --- Metadata ---
+metadata:
+  name: "cas-erd-svc"
+  version: "2.0.0"
+  description: "CAS ERD Service - MatsonLabs Environment"
 
-# Container configuration
-image: 275416279984.dkr.ecr.us-west-2.amazonaws.com/cas-erd-svc:2.0.0
-containerPort: 8080
-registryDomain: 275416279984.dkr.ecr.us-west-2.amazonaws.com
-repositoryName: cas-erd-svc
-tag: 2.0.0
+# --- Infrastructure ---
+infrastructure:
+  vpc:
+    id: "vpc-42de9927"
+    subnets: ["subnet-103d3874", "subnet-c56802b2"]
+  securityGroups:
+    - id: "sg-0a97935f67ae5717e"
+    - name: "cas-erd-svc-sg"
+      rules:
+        - port: 443
+          cidr: "10.120.0.0/24"
 
-# Service configuration
-stackName: cas-erd-svc-v2
-desiredCount: 1
-cpu: 512
-memory: 1024
+# --- ECS Cluster ---
+cluster:
+  name: "cas-erd-svc-cluster"
+  containerInsights: true
 
-# Load balancer configuration (Private IP only)
-publicLoadBalancer: false  # Private IP only deployment
-lbProtocol: HTTPS  # Use HTTPS with certificate (optional - can be HTTP)
-certificateArn: arn:aws:acm:us-west-2:275416279984:certificate/87de9dbf-75e1-4fef-badf-834846d72d02  # Required for HTTPS
-healthCheckPath: /CASSchedulerAdmin/info  # Health check endpoint from CloudFormation
-lbPort: 443  # HTTPS port (use 80 for HTTP)
+# --- Task Definition ---
+taskDefinition:
+  type: "FARGATE"
+  cpu: 512
+  memory: 1024
+  runtimePlatform:
+    cpuArchitecture: "X86_64"
+    os: "LINUX"
+  containers:
+    - name: "app"
+      image: "275416279984.dkr.ecr.us-west-2.amazonaws.com/cas-erd-svc:2.0.0"
+      portMappings:
+        - containerPort: 8080
+          protocol: "tcp"
+      environment:
+        - name: "APP_ENV"
+          value: "dev"
+        - name: "AWS_DEFAULT_REGION"
+          value: "us-west-2"
+        - name: "AWS_REGION"
+          value: "us-west-2"
+        - name: "AWS_SDK_LOAD_CONFIG"
+          value: "1"
+        - name: "AWS_ENABLE_ENDPOINT_DISCOVERY"
+          value: "true"
+      secrets:
+        - name: "DATABASE_URL"
+          valueFrom: "arn:aws:secretsmanager:us-west-2:275416279984:secret:dev/database/matx01/cas-apps/casuser-F2mG3y"
+      healthCheck:
+        command: ["CMD-SHELL", "curl -f https://localhost:8080/CASSchedulerAdmin/info || exit 1"]
+        interval: 30
+        timeout: 5
+    - name: "permission-container"
+      image: "busybox:latest"
+      essential: false
+      readonlyRootFilesystem: true
+      entryPoint: ["sh", "-c"]
+      command: ["chmod 0777 /tmp"]
+      mountPoints:
+        - sourceVolume: "tmp"
+          containerPath: "/tmp"
+          readOnly: false
+        - sourceVolume: "var-lib-amazon"
+          containerPath: "/var/lib/amazon"
+          readOnly: false
+        - sourceVolume: "var-log-amazon"
+          containerPath: "/var/log/amazon"
+          readOnly: false
+  volumes:
+    - name: "var-lib-amazon"
+    - name: "var-log-amazon"
+    - name: "tmp"
+    - name: "var-cache-fontconfig"
 
-# Load balancer health check configuration (optional - uses defaults if not specified)
-loadBalancerHealthCheck:
+# --- ECS Service ---
+service:
+  type: "LOAD_BALANCED"
+  desiredCount: 1
+  deployment:
+    strategy: "ROLLING"
+    waitForSteadyState: true
+  healthCheckGracePeriodSeconds: 600
+
+# --- Load Balancer ---
+loadBalancer:
+  type: "APPLICATION"
+  scheme: "internet-facing"
+  protocol: "HTTPS"
+  port: 443
+  certificateArn: "arn:aws:acm:us-west-2:275416279984:certificate/87de9dbf-75e1-4fef-badf-834846d72d02"
+  targetGroup:
+    healthCheckPath: "/CASSchedulerAdmin/info"
+    healthCheck:
+      enabled: true
+      path: "/CASSchedulerAdmin/info"
+      healthyHttpCodes: "200"
+      interval: 30
+      timeout: 5
+      healthyThresholdCount: 2
+      unhealthyThresholdCount: 3
+
+# --- Auto Scaling ---
+autoScaling:
   enabled: true
-  path: /CASSchedulerAdmin/info  # Override healthCheckPath if specified
-  healthyHttpCodes: '200'
-  interval: 30  # seconds
-  timeout: 5    # seconds
-  healthyThresholdCount: 2
-  unhealthyThresholdCount: 3
+  minCapacity: 1
+  maxCapacity: 2
+  metrics:
+    - type: "CPUUtilization"
+      target: 70
+    - type: "MemoryUtilization"
+      target: 70
 
-# Health check grace period
-healthCheckGracePeriodSeconds: 600
+# --- IAM Roles ---
+iam:
+  taskRole:
+    policies:
+      - "AmazonECS_FullAccess"
+  taskExecutionRole:
+    policies:
+      - "AmazonECSTaskExecutionRolePolicy"
 
-# Additional containers (like permission-container in CloudFormation)
-additionalContainers:
-  - name: permission-container
-    image: busybox:latest
-    essential: false
-    readonlyRootFilesystem: true
-    entryPoint:
-      - sh
-      - "-c"
-    command:
-      - |
-        chmod 0777 /tmp
-    mountPoints:
-      - sourceVolume: tmp
-        containerPath: /tmp
-        readOnly: false
-      - sourceVolume: var-lib-amazon
-        containerPath: /var/lib/amazon
-        readOnly: false
-      - sourceVolume: var-log-amazon
-        containerPath: /var/log/amazon
-        readOnly: false
-
-# Volume configurations
-volumes:
-  - name: var-lib-amazon
-  - name: var-log-amazon
-  - name: tmp
-  - name: var-cache-fontconfig
-
-allowedCidr: 10.120.0.0/24  # CIDR from existing CDK configuration
-
-# Auto scaling (optional)
-enableAutoScaling: true
-minCapacity: 1
-maxCapacity: 2
-targetCpuUtilization: 70
-targetMemoryUtilization: 70
-
-# Logging
-logRetentionDays: 30
-
-# Environment variables (matching existing CDK configuration)
-environment:
-  APP_ENV: dev
-  AWS_DEFAULT_REGION: us-west-2
-  AWS_REGION: us-west-2
-  AWS_SDK_LOAD_CONFIG: "1"
-  AWS_ENABLE_ENDPOINT_DISCOVERY: "true"
-
-# Secrets (if needed)
-secrets:
-  # Database secret from matsonlabs environment
-  DATABASE_URL: arn:aws:secretsmanager:us-west-2:275416279984:secret:dev/database/matx01/cas-apps/casuser-F2mG3y
-
-# Advanced Features (optional)
-# Service Discovery
+# --- Service Discovery ---
 serviceDiscovery:
-  namespace: caserd.local
-  serviceName: cas-erd-svc
-  dnsType: A
+  namespace: "caserd.local"
+  serviceName: "cas-erd-svc"
+  dnsType: "A"
   ttl: 60
 
-# IAM Permissions Configuration
-taskRolePermissions:
-  secretsManager:
-    actions:
-      - secretsmanager:GetSecretValue
-      - secretsmanager:DescribeSecret
-      - secretsmanager:GetResourcePolicy
-      - secretsmanager:ListSecretVersionIds
-      - secretsmanager:ListSecrets
-    resources:
-      - arn:aws:secretsmanager:us-west-2:275416279984:secret:*
-  cloudWatchLogs:
-    actions:
-      - logs:CreateLogGroup
-      - logs:CreateLogStream
-      - logs:PutLogEvents
-      - logs:DescribeLogStreams
-    resources:
-      - "*"
-  kms:
-    actions:
-      - kms:Decrypt
-      - kms:DescribeKey
-    resources:
-      - arn:aws:kms:us-west-2:275416279984:key:*
-  sts:
-    actions:
-      - sts:AssumeRole
-    resources:
-      - "*"
-  # Additional commonly needed permissions for application tasks
-  s3:
-    actions:
-      - s3:GetObject
-      - s3:PutObject
-      - s3:DeleteObject
-      - s3:ListBucket
-    resources:
-      - arn:aws:s3:::my-app-bucket
-      - arn:aws:s3:::my-app-bucket/*
-  sqs:
-    actions:
-      - sqs:SendMessage
-      - sqs:ReceiveMessage
-      - sqs:DeleteMessage
-      - sqs:GetQueueAttributes
-    resources:
-      - arn:aws:sqs:us-west-2:275416279984:*
-  dynamodb:
-    actions:
-      - dynamodb:GetItem
-      - dynamodb:PutItem
-      - dynamodb:UpdateItem
-      - dynamodb:DeleteItem
-      - dynamodb:Query
-      - dynamodb:Scan
-    resources:
-      - arn:aws:dynamodb:us-west-2:275416279984:table/*
-  rds:
-    actions:
-      - rds-db:connect
-    resources:
-      - arn:aws:rds-db:us-west-2:275416279984:dbuser:*
-  cloudWatchMetrics:
-    actions:
-      - cloudwatch:PutMetricData
-    resources:
-      - "*"
-
-taskExecutionRolePermissions:
-  secretsManager:
-    actions:
-      - secretsmanager:GetSecretValue
-    resources:
-      - arn:aws:secretsmanager:us-west-2:275416279984:secret:*
-  cloudWatchLogs:
-    actions:
-      - logs:CreateLogStream
-      - logs:PutLogEvents
-    resources:
-      - "*"
-  ecr:
-    actions:
-      - ecr:GetAuthorizationToken
-      - ecr:BatchCheckLayerAvailability
-      - ecr:GetDownloadUrlForLayer
-      - ecr:BatchGetImage
-    resources:
-      - "*"
-  ssm:
-    actions:
-      - ssm:GetParameters
-      - ssm:GetParameter
-    resources:
-      - "*"
-  kms:
-    actions:
-      - kms:Decrypt
-      - kms:DescribeKey
-    resources:
-      - arn:aws:kms:us-west-2:275416279984:key:*
-  sts:
-    actions:
-      - sts:AssumeRole
-    resources:
-      - "*" 
+# --- Add-ons ---
+addons:
+  logging:
+    driver: "awslogs"
+    options:
+      awslogs-group: "/ecs/cas-erd-svc"
+      awslogs-region: "us-west-2"
+    retentionDays: 30
+  monitoring:
+    enableXRay: false
+    enableCloudWatchAlarms: true
+# --- IAM Roles ---
+iam:
+  taskRole:
+    policies:
+      - "AmazonECS_FullAccess"
+    permissions:
+      secretsManager:
+        actions:
+          - secretsmanager:GetSecretValue
+          - secretsmanager:DescribeSecret
+          - secretsmanager:GetResourcePolicy
+          - secretsmanager:ListSecretVersionIds
+          - secretsmanager:ListSecrets
+        resources:
+          - arn:aws:secretsmanager:us-west-2:275416279984:secret:*
+      cloudWatchLogs:
+        actions:
+          - logs:CreateLogGroup
+          - logs:CreateLogStream
+          - logs:PutLogEvents
+          - logs:DescribeLogStreams
+        resources:
+          - "*"
+      kms:
+        actions:
+          - kms:Decrypt
+          - kms:DescribeKey
+        resources:
+          - arn:aws:kms:us-west-2:275416279984:key:*
+      sts:
+        actions:
+          - sts:AssumeRole
+        resources:
+          - "*"
+      s3:
+        actions:
+          - s3:GetObject
+          - s3:PutObject
+          - s3:DeleteObject
+          - s3:ListBucket
+        resources:
+          - arn:aws:s3:::my-app-bucket
+          - arn:aws:s3:::my-app-bucket/*
+      sqs:
+        actions:
+          - sqs:SendMessage
+          - sqs:ReceiveMessage
+          - sqs:DeleteMessage
+          - sqs:GetQueueAttributes
+        resources:
+          - arn:aws:sqs:us-west-2:275416279984:*
+      dynamodb:
+        actions:
+          - dynamodb:GetItem
+          - dynamodb:PutItem
+          - dynamodb:UpdateItem
+          - dynamodb:DeleteItem
+          - dynamodb:Query
+          - dynamodb:Scan
+        resources:
+          - arn:aws:dynamodb:us-west-2:275416279984:table/*
+      rds:
+        actions:
+          - rds-db:connect
+        resources:
+          - arn:aws:rds-db:us-west-2:275416279984:dbuser:*
+      cloudWatchMetrics:
+        actions:
+          - cloudwatch:PutMetricData
+        resources:
+          - "*"
+  taskExecutionRole:
+    policies:
+      - "AmazonECSTaskExecutionRolePolicy"
+    permissions:
+      secretsManager:
+        actions:
+          - secretsmanager:GetSecretValue
+        resources:
+          - arn:aws:secretsmanager:us-west-2:275416279984:secret:*
+      cloudWatchLogs:
+        actions:
+          - logs:CreateLogStream
+          - logs:PutLogEvents
+        resources:
+          - "*"
+      ecr:
+        actions:
+          - ecr:GetAuthorizationToken
+          - ecr:BatchCheckLayerAvailability
+          - ecr:GetDownloadUrlForLayer
+          - ecr:BatchGetImage
+        resources:
+          - "*"
+      ssm:
+        actions:
+          - ssm:GetParameters
+          - ssm:GetParameter
+        resources:
+          - "*"
+      kms:
+        actions:
+          - kms:Decrypt
+          - kms:DescribeKey
+        resources:
+          - arn:aws:kms:us-west-2:275416279984:key:*
+      sts:
+        actions:
+          - sts:AssumeRole
+        resources:
+          - "*" 

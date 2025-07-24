@@ -1,4 +1,5 @@
 # values-structured-test.yaml - Simple structured format test
+# Usage: cdk deploy -c valuesFile=examples/values-structured-test.yaml
 # This tests the new Helm-like structured configuration
 
 # --- Metadata ---
@@ -12,41 +13,94 @@ infrastructure:
   vpc:
     id: "vpc-42de9927"
     subnets: ["subnet-c56802b2", "subnet-103d3874"]
+  securityGroups:
+    - name: "app-sg"
+      rules:
+        - port: 80
+          cidr: "0.0.0.0/0"
+        - port: 443
+          cidr: "10.0.0.0/16"
 
-# --- Compute ---
-compute:
+# --- ECS Cluster ---
+cluster:
+  name: "test-structured-cluster"
+  containerInsights: true
+
+# --- Task Definition ---
+taskDefinition:
   type: "FARGATE"
   cpu: 256
   memory: 512
+  runtimePlatform:
+    cpuArchitecture: "X86_64"
+    os: "LINUX"
+  containers:
+    - name: "app"
+      image: "nginx:alpine"
+      portMappings:
+        - containerPort: 80
+          protocol: "tcp"
+      environment:
+        - name: "NODE_ENV"
+          value: "test"
+      secrets:
+        - name: "DB_PASSWORD"
+          valueFrom: "arn:aws:ssm:us-east-1:123456789:parameter/db_password"
+      healthCheck:
+        command: ["CMD-SHELL", "curl -f http://localhost/health || exit 1"]
+        interval: 30
+        timeout: 5
 
-# --- Containers ---
-containers:
-  - name: "main"
-    image: "nginx:alpine"
-    portMappings:
-      - containerPort: 80
-        protocol: "tcp"
-    environment:
-      - name: "NODE_ENV"
-        value: "test"
-
-# --- Service ---
+# --- ECS Service ---
 service:
   type: "LOAD_BALANCED"
-  clusterName: "test-structured-cluster"
   desiredCount: 1
-  loadBalancer:
-    type: "APPLICATION"
-    scheme: "internet-facing"
-    protocol: "HTTP"
-    port: 80
-    targetGroup:
-      healthCheckPath: "/"
-      interval: 30
-      timeout: 5
+  deployment:
+    strategy: "ROLLING"
+    waitForSteadyState: true
+
+# --- Load Balancer ---
+loadBalancer:
+  type: "APPLICATION"
+  scheme: "internet-facing"
+  protocol: "HTTP"
+  port: 80
+  targetGroup:
+    healthCheckPath: "/health"
+    stickiness: true
+
+# --- Auto Scaling ---
+autoScaling:
+  enabled: true
+  minCapacity: 1
+  maxCapacity: 5
+  metrics:
+    - type: "CPUUtilization"
+      target: 70
+    - type: "MemoryUtilization"
+      target: 60
+
+# --- IAM Roles ---
+iam:
+  taskRole:
+    policies:
+      - "AmazonECS_FullAccess"
+    custom: |
+      {
+        "Version": "2012-10-17",
+        "Statement": [{ "Effect": "Allow", "Action": "s3:GetObject", "Resource": "*" }]
+      }
+  taskExecutionRole:
+    policies:
+      - "AmazonECSTaskExecutionRolePolicy"
 
 # --- Add-ons ---
 addons:
   logging:
     driver: "awslogs"
-    retentionDays: 7 
+    options:
+      awslogs-group: "/ecs/test-structured-service"
+      awslogs-region: "us-east-1"
+  monitoring:
+    enableXRay: true
+    enableCloudWatchAlarms: true 

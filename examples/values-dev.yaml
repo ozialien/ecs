@@ -1,24 +1,100 @@
 # Development Environment Values
 # Usage: cdk deploy -c valuesFile=examples/values-dev.yaml
 
-vpcId: vpc-12345678
-subnetIds: 
-  - subnet-12345678
-  - subnet-87654321
-clusterName: dev-cluster
-image: nginx:alpine
-serviceName: dev-api
-desiredCount: 1
-cpu: 256
-memory: 512
-containerPort: 80
-lbPort: 80
-healthCheckPath: /
-allowedCidr: 10.0.0.0/8
-logRetentionDays: 7
-enableAutoScaling: false
-environment:
-  NODE_ENV: development
-  API_VERSION: v1
-  LOG_LEVEL: debug
-secrets: {} 
+# --- Metadata ---
+metadata:
+  name: "dev-api"
+  version: "1.0.0"
+  description: "Development API Service"
+
+# --- Infrastructure ---
+infrastructure:
+  vpc:
+    id: "vpc-12345678"
+    subnets: ["subnet-12345678", "subnet-87654321"]
+  securityGroups:
+    - name: "dev-api-sg"
+      rules:
+        - port: 80
+          cidr: "10.0.0.0/8"
+
+# --- ECS Cluster ---
+cluster:
+  name: "dev-cluster"
+  containerInsights: true
+
+# --- Task Definition ---
+taskDefinition:
+  type: "FARGATE"
+  cpu: 256
+  memory: 512
+  runtimePlatform:
+    cpuArchitecture: "X86_64"
+    os: "LINUX"
+  containers:
+    - name: "app"
+      image: "nginx:alpine"
+      portMappings:
+        - containerPort: 80
+          protocol: "tcp"
+      environment:
+        - name: "NODE_ENV"
+          value: "development"
+        - name: "API_VERSION"
+          value: "v1"
+        - name: "LOG_LEVEL"
+          value: "debug"
+      secrets: {}
+      healthCheck:
+        command: ["CMD-SHELL", "curl -f http://localhost/health || exit 1"]
+        interval: 30
+        timeout: 5
+
+# --- ECS Service ---
+service:
+  type: "LOAD_BALANCED"
+  desiredCount: 1
+  deployment:
+    strategy: "ROLLING"
+    waitForSteadyState: true
+
+# --- Load Balancer ---
+loadBalancer:
+  type: "APPLICATION"
+  scheme: "internet-facing"
+  protocol: "HTTP"
+  port: 80
+  targetGroup:
+    healthCheckPath: "/"
+
+# --- Auto Scaling ---
+autoScaling:
+  enabled: false
+  minCapacity: 1
+  maxCapacity: 3
+  metrics:
+    - type: "CPUUtilization"
+      target: 70
+    - type: "MemoryUtilization"
+      target: 60
+
+# --- IAM Roles ---
+iam:
+  taskRole:
+    policies:
+      - "AmazonECS_FullAccess"
+  taskExecutionRole:
+    policies:
+      - "AmazonECSTaskExecutionRolePolicy"
+
+# --- Add-ons ---
+addons:
+  logging:
+    driver: "awslogs"
+    options:
+      awslogs-group: "/ecs/dev-api"
+      awslogs-region: "us-west-2"
+    retentionDays: 7
+  monitoring:
+    enableXRay: false
+    enableCloudWatchAlarms: true 

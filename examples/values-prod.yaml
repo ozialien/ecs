@@ -1,30 +1,104 @@
 # Production Environment Values
 # Usage: cdk deploy -c valuesFile=examples/values-prod.yaml
 
-vpcId: vpc-87654321
-subnetIds: 
-  - subnet-87654321
-  - subnet-12345678
-clusterName: prod-cluster
-image: 123456789012.dkr.ecr.us-west-2.amazonaws.com/myapp:latest
-serviceName: prod-api
-desiredCount: 3
-cpu: 1024
-memory: 2048
-containerPort: 8080
-lbPort: 80
-healthCheckPath: /health
-allowedCidr: 10.0.0.0/8
-logRetentionDays: 30
-enableAutoScaling: true
-minCapacity: 2
-maxCapacity: 10
-targetCpuUtilization: 70
-targetMemoryUtilization: 70
-environment:
-  NODE_ENV: production
-  API_VERSION: v1
-  LOG_LEVEL: info
-secrets:
-  DB_PASSWORD: arn:aws:secretsmanager:us-west-2:123456789012:secret:db-password-abc123
-  API_KEY: arn:aws:secretsmanager:us-west-2:123456789012:secret:api-key-def456 
+# --- Metadata ---
+metadata:
+  name: "prod-api"
+  version: "1.0.0"
+  description: "Production API Service"
+
+# --- Infrastructure ---
+infrastructure:
+  vpc:
+    id: "vpc-87654321"
+    subnets: ["subnet-87654321", "subnet-12345678"]
+  securityGroups:
+    - name: "prod-api-sg"
+      rules:
+        - port: 80
+          cidr: "10.0.0.0/8"
+
+# --- ECS Cluster ---
+cluster:
+  name: "prod-cluster"
+  containerInsights: true
+
+# --- Task Definition ---
+taskDefinition:
+  type: "FARGATE"
+  cpu: 1024
+  memory: 2048
+  runtimePlatform:
+    cpuArchitecture: "X86_64"
+    os: "LINUX"
+  containers:
+    - name: "app"
+      image: "123456789012.dkr.ecr.us-west-2.amazonaws.com/myapp:latest"
+      portMappings:
+        - containerPort: 8080
+          protocol: "tcp"
+      environment:
+        - name: "NODE_ENV"
+          value: "production"
+        - name: "API_VERSION"
+          value: "v1"
+        - name: "LOG_LEVEL"
+          value: "info"
+      secrets:
+        - name: "DB_PASSWORD"
+          valueFrom: "arn:aws:secretsmanager:us-west-2:123456789012:secret:db-password-abc123"
+        - name: "API_KEY"
+          valueFrom: "arn:aws:secretsmanager:us-west-2:123456789012:secret:api-key-def456"
+      healthCheck:
+        command: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+        interval: 30
+        timeout: 5
+
+# --- ECS Service ---
+service:
+  type: "LOAD_BALANCED"
+  desiredCount: 3
+  deployment:
+    strategy: "ROLLING"
+    waitForSteadyState: true
+
+# --- Load Balancer ---
+loadBalancer:
+  type: "APPLICATION"
+  scheme: "internet-facing"
+  protocol: "HTTP"
+  port: 80
+  targetGroup:
+    healthCheckPath: "/health"
+
+# --- Auto Scaling ---
+autoScaling:
+  enabled: true
+  minCapacity: 2
+  maxCapacity: 10
+  metrics:
+    - type: "CPUUtilization"
+      target: 70
+    - type: "MemoryUtilization"
+      target: 70
+
+# --- IAM Roles ---
+iam:
+  taskRole:
+    policies:
+      - "AmazonECS_FullAccess"
+  taskExecutionRole:
+    policies:
+      - "AmazonECSTaskExecutionRolePolicy"
+
+# --- Add-ons ---
+addons:
+  logging:
+    driver: "awslogs"
+    options:
+      awslogs-group: "/ecs/prod-api"
+      awslogs-region: "us-west-2"
+    retentionDays: 30
+  monitoring:
+    enableXRay: true
+    enableCloudWatchAlarms: true 
