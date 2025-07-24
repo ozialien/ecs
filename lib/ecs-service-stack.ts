@@ -212,7 +212,9 @@ export class EcsServiceStack extends cdk.Stack {
         const legacyConfig = ConfigMapper.structuredToLegacy(structuredConfig);
         Object.assign(config, legacyConfig);
       } else {
-        throw new Error('❌ Legacy flat format is no longer supported. Please use the structured Helm-like format.');
+        // Legacy flat format - use directly
+        console.log('📋 Using legacy flat format configuration...');
+        Object.assign(config, values);
       }
     }
 
@@ -368,9 +370,12 @@ export class EcsServiceStack extends cdk.Stack {
       const availabilityZones = this.getContextValue('availabilityZones', config.availabilityZones) || 
         ['us-west-2a', 'us-west-2b', 'us-west-2c'];
       
+      // Ensure availability zones match the number of subnets
+      const azs = availabilityZones.slice(0, subnetIds.length);
+      
       return ec2.Vpc.fromVpcAttributes(this, `${stackName}Vpc`, {
         vpcId: vpcId,
-        availabilityZones: availabilityZones,
+        availabilityZones: azs,
         privateSubnetIds: subnetIds,
         publicSubnetIds: [],
       });

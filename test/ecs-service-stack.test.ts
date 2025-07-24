@@ -21,13 +21,37 @@ describe('EcsServiceStack', () => {
   });
 
   test('creates basic ECS service with minimal configuration', () => {
-    // Mock context parameters for basic configuration
-    app.node.setContext('vpcId', 'vpc-12345678');
-    app.node.setContext('subnetIds', 'subnet-12345678,subnet-87654321');
-    app.node.setContext('clusterName', 'test-cluster');
-    app.node.setContext('image', 'nginx:alpine');
-    app.node.setContext('env', {});
-    app.node.setContext('secret', {});
+    // Mock context parameters for basic configuration using structured format
+    app.node.setContext('infrastructure', {
+      vpc: {
+        id: 'vpc-12345678',
+        subnets: ['subnet-12345678', 'subnet-87654321']
+      }
+    });
+    app.node.setContext('cluster', {
+      name: 'test-cluster'
+    });
+    app.node.setContext('taskDefinition', {
+      type: 'FARGATE',
+      cpu: 256,
+      memory: 512,
+      containers: [{
+        name: 'app',
+        image: 'nginx:alpine',
+        portMappings: [{
+          containerPort: 80,
+          protocol: 'tcp'
+        }]
+      }]
+    });
+    app.node.setContext('service', {
+      type: 'LOAD_BALANCED',
+      desiredCount: 1
+    });
+    app.node.setContext('loadBalancer', {
+      type: 'APPLICATION',
+      port: 80
+    });
 
     const stack = new EcsServiceStack(app, 'BasicEcsService', {
       env: {
