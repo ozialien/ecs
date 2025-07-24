@@ -382,7 +382,7 @@ export class EcsServiceStack extends cdk.Stack {
     return new ecs.Cluster(this, `${stackName}Cluster`, {
       clusterName: clusterName,
       vpc: vpc,
-      containerInsightsV2: ecs.ContainerInsights.ENABLED,
+      containerInsights: true,
     });
   }
 
