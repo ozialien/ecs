@@ -620,3 +620,19 @@ Create a cdk deployment tool for deploying ecs environments.
 - **Lesson**: When changing core structure, must update ALL documentation comprehensively
 - **Requirement**: Help system must always reflect current implementation
 - **Follow-up**: All documentation now consistent with ECS hierarchy structure
+
+#### 32. CDK Code and Help Mismatch - Context Parameters Alignment
+- **Requirement**: CDK code must support the same context parameters documented in help
+- **Issue**: CDK code only supported legacy flat parameters, but help showed new structured parameters
+- **Updates Made**:
+  - **bin/cdk.ts**: Added support for new structured context parameters (metadata, infrastructure, cluster, taskDefinition, service, loadBalancer, autoScaling, iam, serviceDiscovery, addons)
+  - **lib/help.ts**: Updated to show both legacy flat parameters and new structured parameters
+  - **lib/cli.ts**: Updated to show both parameter types with clear distinction
+- **Key Changes**:
+  - CDK now accepts both legacy flat parameters and new structured parameters
+  - Help documentation clearly distinguishes between legacy and structured parameters
+  - Added note that structured parameters are typically used in values files
+  - Maintained backward compatibility for all existing -c options
+- **Lesson**: CDK implementation must always match documented capabilities
+- **Requirement**: All -c options documented must be supported by the CDK code
+- **Follow-up**: CDK code and documentation are now fully aligned

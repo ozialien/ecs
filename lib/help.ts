@@ -69,6 +69,9 @@ Using Values File with Overrides (Helm-style):
 📝 CONTEXT PARAMETERS
 ====================
 
+The CDK supports both legacy flat parameters and new structured ECS hierarchy parameters:
+
+LEGACY FLAT PARAMETERS (Backward Compatible):
 REQUIRED PARAMETERS:
   vpcId                    VPC ID where the ECS service will be deployed
   subnetIds                Subnet IDs (comma-separated or array)
@@ -97,6 +100,20 @@ OPTIONAL PARAMETERS:
   taskRolePermissions      IAM permissions for task role (optional)
   taskExecutionRolePermissions IAM permissions for task execution role (optional)
   valuesFile               Values file path for loading configuration from file
+
+NEW STRUCTURED PARAMETERS (ECS Hierarchy):
+  metadata                 Metadata section (name, version, description)
+  infrastructure           Infrastructure section (vpc, securityGroups)
+  cluster                  ECS cluster configuration
+  taskDefinition           Task definition with containers and resources
+  service                  ECS service configuration
+  loadBalancer             Load balancer configuration
+  autoScaling              Auto scaling configuration
+  iam                      IAM roles and permissions
+  serviceDiscovery         Service discovery configuration
+  addons                   Add-ons (logging, monitoring, etc.)
+
+Note: Structured parameters are typically used in values files rather than individual -c options.
 
 📋 STRUCTURED VALUES FILE FORMAT
 ===============================

@@ -193,6 +193,8 @@ VALUES FILE SUPPORT:
 
 CONTEXT PARAMETERS:
   All configuration is done via --context parameters:
+
+LEGACY FLAT PARAMETERS (Backward Compatible):
   --context vpcId=<vpc-id>
   --context subnetIds=<subnet-ids>
   --context clusterName=<cluster-name>
@@ -214,6 +216,20 @@ CONTEXT PARAMETERS:
   --context logRetentionDays=<days>
   --context taskExecutionRoleArn=<arn>
   --context taskRoleArn=<arn>
+
+NEW STRUCTURED PARAMETERS (ECS Hierarchy):
+  --context metadata=<json-object>
+  --context infrastructure=<json-object>
+  --context cluster=<json-object>
+  --context taskDefinition=<json-object>
+  --context service=<json-object>
+  --context loadBalancer=<json-object>
+  --context autoScaling=<json-object>
+  --context iam=<json-object>
+  --context serviceDiscovery=<json-object>
+  --context addons=<json-object>
+
+Note: Structured parameters are typically used in values files rather than individual -c options.
 
 For detailed parameter documentation, run:
   matson-ecs deploy --context help=true
