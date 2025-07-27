@@ -266,7 +266,7 @@ describe('CDK Synthesis Integration Tests', () => {
           name: 'test-cluster'
         },
         taskDefinition: {
-          type: 'FARGATE',
+          type: 'FARGATE' as const,
           cpu: 512,
           memory: 1024,
           containers: [{
@@ -291,12 +291,12 @@ describe('CDK Synthesis Integration Tests', () => {
           }]
         },
         service: {
-          type: 'LOAD_BALANCED',
+          type: 'LOAD_BALANCED' as const,
           desiredCount: 2,
           healthCheckGracePeriodSeconds: 60
         },
         loadBalancer: {
-          type: 'APPLICATION',
+          type: 'APPLICATION' as const,
           port: 80,
           targetGroup: {
             healthCheckPath: '/health',
@@ -399,17 +399,17 @@ describe('CDK Synthesis Integration Tests', () => {
           name: 'test-cluster'
         },
         taskDefinition: {
-          type: 'FARGATE',
+          type: 'FARGATE' as const,
           cpu: 256,
           memory: 512,
           containers: [] // No containers
         },
         service: {
-          type: 'LOAD_BALANCED',
+          type: 'LOAD_BALANCED' as const,
           desiredCount: 1
         },
         loadBalancer: {
-          type: 'APPLICATION',
+          type: 'APPLICATION' as const,
           port: 80
         }
       };
@@ -443,7 +443,7 @@ describe('CDK Synthesis Integration Tests', () => {
           name: 'test-cluster'
         },
         taskDefinition: {
-          type: 'FARGATE',
+          type: 'FARGATE' as const,
           cpu: 256,
           memory: 512,
           containers: [{
@@ -456,11 +456,11 @@ describe('CDK Synthesis Integration Tests', () => {
           }]
         },
         service: {
-          type: 'LOAD_BALANCED',
+          type: 'LOAD_BALANCED' as const,
           desiredCount: 1
         },
         loadBalancer: {
-          type: 'APPLICATION',
+          type: 'APPLICATION' as const,
           port: 80
         }
       };

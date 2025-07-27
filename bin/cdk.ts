@@ -25,42 +25,23 @@ let config: Partial<EcsServiceConfig> = {};
 // 1. Load from values file FIRST if specified
 const valuesFile = app.node.tryGetContext('valuesFile');
 if (valuesFile) {
+  console.log(`Values file specified: ${valuesFile}`);
+  // Load values from file
   const fs = require('fs');
   const path = require('path');
+  const yaml = require('js-yaml');
   
-  if (fs.existsSync(valuesFile)) {
-    try {
-      const fileContent = fs.readFileSync(valuesFile, 'utf8');
-      const ext = path.extname(valuesFile).toLowerCase();
-      
-      let values: any;
-      try {
-        switch (ext) {
-          case '.js':
-            values = require(path.resolve(valuesFile));
-            break;
-          case '.yaml':
-          case '.yml':
-            const yaml = require('js-yaml');
-            values = yaml.load(fileContent);
-            break;
-          default:
-            values = JSON.parse(fileContent);
-        }
-      } catch (error) {
-        console.error(`❌ Error parsing values file ${valuesFile}: ${error}`);
-        process.exit(1);
-      }
-      
-      // Load values file into config
-      config = { ...config, ...values };
-      console.log(`📄 Loaded values from: ${valuesFile}`);
-    } catch (error) {
-      console.warn(`⚠️  Warning: Failed to parse values file ${valuesFile}: ${error}`);
-    }
-  } else {
-    console.warn(`⚠️  Warning: Values file not found: ${valuesFile}`);
+  const filePath = path.resolve(valuesFile);
+  if (!fs.existsSync(filePath)) {
+    console.error(`❌ Error: Values file not found: ${filePath}`);
+    process.exit(1);
   }
+  
+  const fileContent = fs.readFileSync(filePath, 'utf8');
+  const values = yaml.load(fileContent);
+  
+  // Merge values into config
+  config = { ...config, ...values };
 }
 
 // 2. Override with context parameters (highest precedence)
@@ -78,26 +59,39 @@ contextKeys.forEach(key => {
   }
 });
 
-// 3. Validate that required structured configuration is present
-// The CDK stack will handle validation of required parameters
-if (!config.infrastructure?.vpc?.id) {
-  console.error('❌ Error: Required infrastructure.vpc.id is missing.');
-  console.error('   Use values file or structured context parameters.');
-  console.error('');
-  console.error('Examples:');
-  console.error('  cdk deploy -c valuesFile=values.yaml');
-  console.error('  cdk deploy -c infrastructure.vpc.id=vpc-12345678');
-  process.exit(1);
+// 3. Check for help request before validation
+const help = app.node.tryGetContext('help');
+if (help === 'true' || help === true) {
+  // Create stack with minimal config for help display
+  new EcsServiceStack(app, 'HelpStack', {
+    env: {
+      account: process.env.CDK_DEFAULT_ACCOUNT,
+      region: process.env.CDK_DEFAULT_REGION,
+    },
+    config: { metadata: { name: 'help', version: '1.0.0' } } as EcsServiceConfig,
+  });
+} else {
+  // Validate that required structured configuration is present
+  // The CDK stack will handle validation of required parameters
+  if (!config.infrastructure?.vpc?.id) {
+    console.error('❌ Error: Required infrastructure.vpc.id is missing.');
+    console.error('   Use values file or structured context parameters.');
+    console.error('');
+    console.error('Examples:');
+    console.error('  cdk deploy -c valuesFile=values.yaml');
+    console.error('  cdk deploy -c infrastructure.vpc.id=vpc-12345678');
+    process.exit(1);
+  }
+  
+  // Create the ECS service stack using metadata name or default
+  const stackName = config.metadata?.name || 'EcsServiceStack';
+  new EcsServiceStack(app, stackName, {
+    env: {
+      account: process.env.CDK_DEFAULT_ACCOUNT,
+      region: process.env.CDK_DEFAULT_REGION,
+    },
+    config: config as EcsServiceConfig,
+  });
 }
-
-// Create the ECS service stack using metadata name or default
-const stackName = config.metadata?.name || 'EcsServiceStack';
-new EcsServiceStack(app, stackName, {
-  env: {
-    account: process.env.CDK_DEFAULT_ACCOUNT,
-    region: process.env.CDK_DEFAULT_REGION,
-  },
-  config: config as EcsServiceConfig,
-});
 
 app.synth(); 

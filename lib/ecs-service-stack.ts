@@ -71,9 +71,14 @@ export class EcsServiceStack extends cdk.Stack {
     
     this.stackProps = props;
 
-    // Check for help request first
+    // Check for help request first - must be before any configuration loading
     if (this.isHelpRequested()) {
       showHelp();
+      // Create a dummy output to satisfy CDK requirements
+      new cdk.CfnOutput(this, 'HelpDisplayed', {
+        value: 'Help information was displayed',
+        description: 'Help was requested and displayed',
+      });
       return;
     }
 
