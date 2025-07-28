@@ -72,7 +72,7 @@ describe('Load Balancer Configuration', () => {
 
     // Verify security group allows traffic from specified CIDR
     template.hasResourceProperties('AWS::EC2::SecurityGroup', {
-      GroupDescription: expect.stringContaining('Automatically created Security Group for ELB InternalLoadBalancerEcsServiceteststackServiceLBEF5913A4')
+      GroupDescription: 'Automatically created Security Group for ELB InternalLoadBalancerEcsServiceteststackServiceLBEF5913A4'
     });
   });
 
