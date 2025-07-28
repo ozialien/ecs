@@ -1,0 +1,486 @@
+{
+ "Resources": {
+  "testserviceClusterBEC51C0C": {
+   "Type": "AWS::ECS::Cluster",
+   "Properties": {
+    "ClusterName": "test-cluster",
+    "ClusterSettings": [
+     {
+      "Name": "containerInsights",
+      "Value": "enabled"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "test-service/test-serviceCluster/Resource"
+   }
+  },
+  "testserviceLogGroupCC8A11E5": {
+   "Type": "AWS::Logs::LogGroup",
+   "Properties": {
+    "LogGroupName": "/ecs/test-service",
+    "RetentionInDays": 7
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "test-service/test-serviceLogGroup/Resource"
+   }
+  },
+  "testserviceExecutionRole7DDBF6F6": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "ecs-tasks.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+       ]
+      ]
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "test-service/test-serviceExecutionRole/Resource"
+   }
+  },
+  "testserviceExecutionRoleDefaultPolicyA21D55FA": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::GetAtt": [
+         "testserviceLogGroupCC8A11E5",
+         "Arn"
+        ]
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "testserviceExecutionRoleDefaultPolicyA21D55FA",
+    "Roles": [
+     {
+      "Ref": "testserviceExecutionRole7DDBF6F6"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "test-service/test-serviceExecutionRole/DefaultPolicy/Resource"
+   }
+  },
+  "testserviceTaskRole90CE26BB": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "ecs-tasks.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "test-service/test-serviceTaskRole/Resource"
+   }
+  },
+  "testserviceTaskDef82F54E40": {
+   "Type": "AWS::ECS::TaskDefinition",
+   "Properties": {
+    "ContainerDefinitions": [
+     {
+      "Essential": true,
+      "Image": "nginx:alpine",
+      "LogConfiguration": {
+       "LogDriver": "awslogs",
+       "Options": {
+        "awslogs-group": {
+         "Ref": "testserviceLogGroupCC8A11E5"
+        },
+        "awslogs-stream-prefix": "test-service",
+        "awslogs-region": "us-west-2"
+       }
+      },
+      "Name": "test-serviceContainer",
+      "PortMappings": [
+       {
+        "ContainerPort": 80,
+        "Protocol": "tcp"
+       }
+      ]
+     }
+    ],
+    "Cpu": "256",
+    "ExecutionRoleArn": {
+     "Fn::GetAtt": [
+      "testserviceExecutionRole7DDBF6F6",
+      "Arn"
+     ]
+    },
+    "Family": "testservicetestserviceTaskDef6B76440A",
+    "Memory": "512",
+    "NetworkMode": "awsvpc",
+    "RequiresCompatibilities": [
+     "FARGATE"
+    ],
+    "TaskRoleArn": {
+     "Fn::GetAtt": [
+      "testserviceTaskRole90CE26BB",
+      "Arn"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "test-service/test-serviceTaskDef/Resource"
+   }
+  },
+  "testserviceServiceLB9E577211": {
+   "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+   "Properties": {
+    "LoadBalancerAttributes": [
+     {
+      "Key": "deletion_protection.enabled",
+      "Value": "false"
+     }
+    ],
+    "Scheme": "internet-facing",
+    "SecurityGroups": [
+     {
+      "Fn::GetAtt": [
+       "testserviceServiceLBSecurityGroup69E889E0",
+       "GroupId"
+      ]
+     }
+    ],
+    "Subnets": [
+     "subnet-12345678",
+     "subnet-87654321"
+    ],
+    "Type": "application"
+   },
+   "Metadata": {
+    "aws:cdk:path": "test-service/test-serviceService/LB/Resource"
+   }
+  },
+  "testserviceServiceLBSecurityGroup69E889E0": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "Automatically created Security Group for ELB testservicetestserviceServiceLB05F16955",
+    "SecurityGroupIngress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow from anyone on port 80",
+      "FromPort": 80,
+      "IpProtocol": "tcp",
+      "ToPort": 80
+     }
+    ],
+    "VpcId": "vpc-12345678"
+   },
+   "Metadata": {
+    "aws:cdk:path": "test-service/test-serviceService/LB/SecurityGroup/Resource"
+   }
+  },
+  "testserviceServiceLBSecurityGrouptotestservicetestserviceServiceSecurityGroup2B23050980D8B84B05": {
+   "Type": "AWS::EC2::SecurityGroupEgress",
+   "Properties": {
+    "Description": "Load balancer to target",
+    "DestinationSecurityGroupId": {
+     "Fn::GetAtt": [
+      "testserviceServiceSecurityGroup7B37710C",
+      "GroupId"
+     ]
+    },
+    "FromPort": 80,
+    "GroupId": {
+     "Fn::GetAtt": [
+      "testserviceServiceLBSecurityGroup69E889E0",
+      "GroupId"
+     ]
+    },
+    "IpProtocol": "tcp",
+    "ToPort": 80
+   },
+   "Metadata": {
+    "aws:cdk:path": "test-service/test-serviceService/LB/SecurityGroup/to testservicetestserviceServiceSecurityGroup2B230509:80"
+   }
+  },
+  "testserviceServiceLBPublicListener720082A7": {
+   "Type": "AWS::ElasticLoadBalancingV2::Listener",
+   "Properties": {
+    "DefaultActions": [
+     {
+      "TargetGroupArn": {
+       "Ref": "testserviceServiceLBPublicListenerECSGroup5A6800A9"
+      },
+      "Type": "forward"
+     }
+    ],
+    "LoadBalancerArn": {
+     "Ref": "testserviceServiceLB9E577211"
+    },
+    "Port": 80,
+    "Protocol": "HTTP"
+   },
+   "Metadata": {
+    "aws:cdk:path": "test-service/test-serviceService/LB/PublicListener/Resource"
+   }
+  },
+  "testserviceServiceLBPublicListenerECSGroup5A6800A9": {
+   "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+   "Properties": {
+    "HealthCheckIntervalSeconds": 30,
+    "HealthCheckPath": "/",
+    "HealthCheckTimeoutSeconds": 5,
+    "HealthyThresholdCount": 2,
+    "Matcher": {
+     "HttpCode": "200"
+    },
+    "Port": 80,
+    "Protocol": "HTTP",
+    "TargetGroupAttributes": [
+     {
+      "Key": "stickiness.enabled",
+      "Value": "false"
+     }
+    ],
+    "TargetType": "ip",
+    "UnhealthyThresholdCount": 3,
+    "VpcId": "vpc-12345678"
+   },
+   "Metadata": {
+    "aws:cdk:path": "test-service/test-serviceService/LB/PublicListener/ECSGroup/Resource"
+   }
+  },
+  "testserviceService2843C524": {
+   "Type": "AWS::ECS::Service",
+   "Properties": {
+    "Cluster": {
+     "Ref": "testserviceClusterBEC51C0C"
+    },
+    "DeploymentConfiguration": {
+     "Alarms": {
+      "AlarmNames": [],
+      "Enable": false,
+      "Rollback": false
+     },
+     "MaximumPercent": 200,
+     "MinimumHealthyPercent": 50
+    },
+    "DesiredCount": 1,
+    "EnableECSManagedTags": false,
+    "HealthCheckGracePeriodSeconds": 60,
+    "LaunchType": "FARGATE",
+    "LoadBalancers": [
+     {
+      "ContainerName": "test-serviceContainer",
+      "ContainerPort": 80,
+      "TargetGroupArn": {
+       "Ref": "testserviceServiceLBPublicListenerECSGroup5A6800A9"
+      }
+     }
+    ],
+    "NetworkConfiguration": {
+     "AwsvpcConfiguration": {
+      "AssignPublicIp": "DISABLED",
+      "SecurityGroups": [
+       {
+        "Fn::GetAtt": [
+         "testserviceServiceSecurityGroup7B37710C",
+         "GroupId"
+        ]
+       }
+      ],
+      "Subnets": [
+       "subnet-12345678",
+       "subnet-87654321"
+      ]
+     }
+    },
+    "ServiceName": "test-service",
+    "TaskDefinition": {
+     "Ref": "testserviceTaskDef82F54E40"
+    }
+   },
+   "DependsOn": [
+    "testserviceServiceLBPublicListenerECSGroup5A6800A9",
+    "testserviceServiceLBPublicListener720082A7",
+    "testserviceTaskRole90CE26BB"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "test-service/test-serviceService/Service/Service"
+   }
+  },
+  "testserviceServiceSecurityGroup7B37710C": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "test-service/test-serviceService/Service/SecurityGroup",
+    "SecurityGroupEgress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow all outbound traffic by default",
+      "IpProtocol": "-1"
+     }
+    ],
+    "VpcId": "vpc-12345678"
+   },
+   "DependsOn": [
+    "testserviceTaskRole90CE26BB"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "test-service/test-serviceService/Service/SecurityGroup/Resource"
+   }
+  },
+  "testserviceServiceSecurityGroupfromtestservicetestserviceServiceLBSecurityGroupDEDBF5E6802E041924": {
+   "Type": "AWS::EC2::SecurityGroupIngress",
+   "Properties": {
+    "Description": "Load balancer to target",
+    "FromPort": 80,
+    "GroupId": {
+     "Fn::GetAtt": [
+      "testserviceServiceSecurityGroup7B37710C",
+      "GroupId"
+     ]
+    },
+    "IpProtocol": "tcp",
+    "SourceSecurityGroupId": {
+     "Fn::GetAtt": [
+      "testserviceServiceLBSecurityGroup69E889E0",
+      "GroupId"
+     ]
+    },
+    "ToPort": 80
+   },
+   "DependsOn": [
+    "testserviceTaskRole90CE26BB"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "test-service/test-serviceService/Service/SecurityGroup/from testservicetestserviceServiceLBSecurityGroupDEDBF5E6:80"
+   }
+  },
+  "CDKMetadata": {
+   "Type": "AWS::CDK::Metadata",
+   "Properties": {
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/31PS2vDMAz+Lb27XpbD2HXr1jEobCS9F9VRg1rXDpbcUkz++3D6IHRjJ31PJJW6LJ50MYEjT02zm1pa61QLmJ2qkH0MBhUceZXQsE4zG1kwqNnGXeEcQguCS+DdG27IkZB3OXCveCdADsNIu3RrDAcymEsX2CvrW9Zp4duP4GOXrSvuFcFep8rboTHMb2/JnDI9o16h4VUHIhgc65eus2Qg71x4aF7BgjPY3K1HCyxkrIdmPSTItYdSp7/b4XzTiI9zxILukrnikb+E0KLcXhvRfHmpU40mBpLTLfK/8N4GZP4lf7pB7/vsfEXpovTK+Qb1lh8OZaEfn3Ux2TLRNEQntEddnecPMzqmARcCAAA="
+   },
+   "Metadata": {
+    "aws:cdk:path": "test-service/CDKMetadata/Default"
+   }
+  }
+ },
+ "Outputs": {
+  "testserviceServiceLoadBalancerDNS4B507A57": {
+   "Value": {
+    "Fn::GetAtt": [
+     "testserviceServiceLB9E577211",
+     "DNSName"
+    ]
+   }
+  },
+  "testserviceServiceServiceURLCE85A5B8": {
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      "http://",
+      {
+       "Fn::GetAtt": [
+        "testserviceServiceLB9E577211",
+        "DNSName"
+       ]
+      }
+     ]
+    ]
+   }
+  },
+  "ServiceName": {
+   "Description": "ECS Service Name",
+   "Value": "test-service",
+   "Export": {
+    "Name": "test-service-service-name"
+   }
+  },
+  "LoadBalancerDNS": {
+   "Description": "Load Balancer DNS Name",
+   "Value": {
+    "Fn::GetAtt": [
+     "testserviceServiceLB9E577211",
+     "DNSName"
+    ]
+   },
+   "Export": {
+    "Name": "test-service-load-balancer-dns"
+   }
+  },
+  "ClusterName": {
+   "Description": "ECS Cluster Name",
+   "Value": "test-cluster",
+   "Export": {
+    "Name": "test-service-cluster-name"
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

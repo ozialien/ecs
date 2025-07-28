@@ -1,0 +1,21 @@
+{
+  "version": "45.0.0",
+  "files": {
+    "2c5881eb0d4a36aff9650847b5992b2ad1dc475ef9d6662a71ca16d16e5028ef": {
+      "displayName": "cas-erd-svc Template",
+      "source": {
+        "path": "cas-erd-svc.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "275416279984-us-west-2-679e8c8f": {
+          "bucketName": "cdk-hnb659fds-assets-275416279984-us-west-2",
+          "objectKey": "2c5881eb0d4a36aff9650847b5992b2ad1dc475ef9d6662a71ca16d16e5028ef.json",
+          "region": "us-west-2",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::275416279984:role/cdk-hnb659fds-file-publishing-role-275416279984-us-west-2"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

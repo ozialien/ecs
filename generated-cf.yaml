@@ -1,0 +1,444 @@
+📄 Loaded values from: examples/values-cas-erd-svc.yaml
+📝 Importing existing VPC: vpc-42de9927
+📝 Creating new cluster: cas-erd-svc-matsonlabs-cluster
+Resources:
+  caserdsvcClusterAE036170:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: cas-erd-svc-matsonlabs-cluster
+      ClusterSettings:
+        - Name: containerInsights
+          Value: enabled
+    Metadata:
+      aws:cdk:path: cas-erd-svc/cas-erd-svcCluster/Resource
+  caserdsvcLogGroup152C5A3C:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /ecs/cas-erd-svc
+      RetentionInDays: 30
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: cas-erd-svc/cas-erd-svcLogGroup/Resource
+  caserdsvcExecutionRoleB41A3B76:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+        Version: "2012-10-17"
+      ManagedPolicyArns:
+        - Fn::Join:
+            - ""
+            - - "arn:"
+              - Ref: AWS::Partition
+              - :iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+    Metadata:
+      aws:cdk:path: cas-erd-svc/cas-erd-svcExecutionRole/Resource
+  caserdsvcExecutionRoleDefaultPolicy738E2EAA:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action:
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Effect: Allow
+            Resource: "*"
+          - Action:
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Effect: Allow
+            Resource:
+              Fn::GetAtt:
+                - caserdsvcLogGroup152C5A3C
+                - Arn
+        Version: "2012-10-17"
+      PolicyName: caserdsvcExecutionRoleDefaultPolicy738E2EAA
+      Roles:
+        - Ref: caserdsvcExecutionRoleB41A3B76
+    Metadata:
+      aws:cdk:path: cas-erd-svc/cas-erd-svcExecutionRole/DefaultPolicy/Resource
+  caserdsvcTaskRole52717DAF:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+        Version: "2012-10-17"
+    Metadata:
+      aws:cdk:path: cas-erd-svc/cas-erd-svcTaskRole/Resource
+  caserdsvcTaskRoleDefaultPolicy110DBBDF:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action:
+              - secretsmanager:DescribeSecret
+              - secretsmanager:GetResourcePolicy
+              - secretsmanager:GetSecretValue
+              - secretsmanager:ListSecretVersionIds
+              - secretsmanager:ListSecrets
+            Effect: Allow
+            Resource: arn:aws:secretsmanager:us-west-2:275416279984:secret:*
+          - Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:DescribeLogStreams
+              - logs:PutLogEvents
+            Effect: Allow
+            Resource: "*"
+          - Action:
+              - kms:Decrypt
+              - kms:DescribeKey
+            Effect: Allow
+            Resource: arn:aws:kms:us-west-2:275416279984:key/*
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Resource: "*"
+        Version: "2012-10-17"
+      PolicyName: caserdsvcTaskRoleDefaultPolicy110DBBDF
+      Roles:
+        - Ref: caserdsvcTaskRole52717DAF
+    Metadata:
+      aws:cdk:path: cas-erd-svc/cas-erd-svcTaskRole/DefaultPolicy/Resource
+  caserdsvcTaskDef3088D146:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      ContainerDefinitions:
+        - Environment:
+            - Name: APP_ENV
+              Value: dev
+            - Name: AWS_DEFAULT_REGION
+              Value: us-west-2
+            - Name: AWS_REGION
+              Value: us-west-2
+            - Name: AWS_SDK_LOAD_CONFIG
+              Value: "1"
+            - Name: AWS_ENABLE_ENDPOINT_DISCOVERY
+              Value: "true"
+          Essential: true
+          Image: 275416279984.dkr.ecr.us-west-2.amazonaws.com/cas-erd-svc:2.0.0
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group:
+                Ref: caserdsvcLogGroup152C5A3C
+              awslogs-stream-prefix: cas-erd-svc
+              awslogs-region: us-west-2
+          Name: main
+          PortMappings:
+            - ContainerPort: 8080
+              Protocol: tcp
+      Cpu: "512"
+      ExecutionRoleArn:
+        Fn::GetAtt:
+          - caserdsvcExecutionRoleB41A3B76
+          - Arn
+      Family: caserdsvccaserdsvcTaskDefAC5A7549
+      Memory: "1024"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      TaskRoleArn:
+        Fn::GetAtt:
+          - caserdsvcTaskRole52717DAF
+          - Arn
+    Metadata:
+      aws:cdk:path: cas-erd-svc/cas-erd-svcTaskDef/Resource
+  caserdsvcServiceLB5ABB90D5:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      LoadBalancerAttributes:
+        - Key: deletion_protection.enabled
+          Value: "false"
+      Scheme: internal
+      SecurityGroups:
+        - Fn::GetAtt:
+            - caserdsvcServiceLBSecurityGroup20A10884
+            - GroupId
+      Subnets:
+        - subnet-103d3874
+        - subnet-c56802b2
+      Type: application
+    Metadata:
+      aws:cdk:path: cas-erd-svc/cas-erd-svcService/LB/Resource
+  caserdsvcServiceLBSecurityGroup20A10884:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Automatically created Security Group for ELB caserdsvccaserdsvcServiceLB3C158780
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          Description: Allow from anyone on port 80
+          FromPort: 80
+          IpProtocol: tcp
+          ToPort: 80
+        - CidrIp: 10.120.0.0/24
+          Description: Allow HTTP from 10.120.0.0/24
+          FromPort: 80
+          IpProtocol: tcp
+          ToPort: 80
+      VpcId: vpc-42de9927
+    Metadata:
+      aws:cdk:path: cas-erd-svc/cas-erd-svcService/LB/SecurityGroup/Resource
+  caserdsvcServiceLBSecurityGrouptocaserdsvccaserdsvcServiceSecurityGroup793C00FC808076C05575:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      Description: Load balancer to target
+      DestinationSecurityGroupId:
+        Fn::GetAtt:
+          - caserdsvcServiceSecurityGroupE5A3CCE7
+          - GroupId
+      FromPort: 8080
+      GroupId:
+        Fn::GetAtt:
+          - caserdsvcServiceLBSecurityGroup20A10884
+          - GroupId
+      IpProtocol: tcp
+      ToPort: 8080
+    Metadata:
+      aws:cdk:path: cas-erd-svc/cas-erd-svcService/LB/SecurityGroup/to caserdsvccaserdsvcServiceSecurityGroup793C00FC:8080
+  caserdsvcServiceLBPublicListener0F8B24E4:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - TargetGroupArn:
+            Ref: caserdsvcServiceLBPublicListenerECSGroup5A1F5B28
+          Type: forward
+      LoadBalancerArn:
+        Ref: caserdsvcServiceLB5ABB90D5
+      Port: 80
+      Protocol: HTTP
+    Metadata:
+      aws:cdk:path: cas-erd-svc/cas-erd-svcService/LB/PublicListener/Resource
+  caserdsvcServiceLBPublicListenerECSGroup5A1F5B28:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: /casreferenceservice/
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      Matcher:
+        HttpCode: "200"
+      Port: 80
+      Protocol: HTTP
+      TargetGroupAttributes:
+        - Key: stickiness.enabled
+          Value: "false"
+      TargetType: ip
+      UnhealthyThresholdCount: 3
+      VpcId: vpc-42de9927
+    Metadata:
+      aws:cdk:path: cas-erd-svc/cas-erd-svcService/LB/PublicListener/ECSGroup/Resource
+  caserdsvcServiceFE2DDE97:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster:
+        Ref: caserdsvcClusterAE036170
+      DeploymentConfiguration:
+        Alarms:
+          AlarmNames: []
+          Enable: false
+          Rollback: false
+        MaximumPercent: 200
+        MinimumHealthyPercent: 50
+      DesiredCount: 1
+      EnableECSManagedTags: false
+      HealthCheckGracePeriodSeconds: 60
+      LaunchType: FARGATE
+      LoadBalancers:
+        - ContainerName: main
+          ContainerPort: 8080
+          TargetGroupArn:
+            Ref: caserdsvcServiceLBPublicListenerECSGroup5A1F5B28
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          SecurityGroups:
+            - Fn::GetAtt:
+                - caserdsvcServiceSecurityGroupE5A3CCE7
+                - GroupId
+          Subnets:
+            - subnet-103d3874
+            - subnet-c56802b2
+      ServiceName: cas-erd-svc
+      TaskDefinition:
+        Ref: caserdsvcTaskDef3088D146
+    DependsOn:
+      - caserdsvcServiceLBPublicListenerECSGroup5A1F5B28
+      - caserdsvcServiceLBPublicListener0F8B24E4
+      - caserdsvcTaskRoleDefaultPolicy110DBBDF
+      - caserdsvcTaskRole52717DAF
+    Metadata:
+      aws:cdk:path: cas-erd-svc/cas-erd-svcService/Service/Service
+  caserdsvcServiceSecurityGroupE5A3CCE7:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: cas-erd-svc/cas-erd-svcService/Service/SecurityGroup
+      SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          Description: Allow all outbound traffic by default
+          IpProtocol: "-1"
+      VpcId: vpc-42de9927
+    DependsOn:
+      - caserdsvcTaskRoleDefaultPolicy110DBBDF
+      - caserdsvcTaskRole52717DAF
+    Metadata:
+      aws:cdk:path: cas-erd-svc/cas-erd-svcService/Service/SecurityGroup/Resource
+  caserdsvcServiceSecurityGroupfromcaserdsvccaserdsvcServiceLBSecurityGroup3722FF6E8080A8146F55:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Load balancer to target
+      FromPort: 8080
+      GroupId:
+        Fn::GetAtt:
+          - caserdsvcServiceSecurityGroupE5A3CCE7
+          - GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        Fn::GetAtt:
+          - caserdsvcServiceLBSecurityGroup20A10884
+          - GroupId
+      ToPort: 8080
+    DependsOn:
+      - caserdsvcTaskRoleDefaultPolicy110DBBDF
+      - caserdsvcTaskRole52717DAF
+    Metadata:
+      aws:cdk:path: cas-erd-svc/cas-erd-svcService/Service/SecurityGroup/from caserdsvccaserdsvcServiceLBSecurityGroup3722FF6E:8080
+  caserdsvcServiceTaskCountTarget78D40BD5:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      MaxCapacity: 2
+      MinCapacity: 1
+      ResourceId:
+        Fn::Join:
+          - ""
+          - - service/
+            - Ref: caserdsvcClusterAE036170
+            - /
+            - Fn::GetAtt:
+                - caserdsvcServiceFE2DDE97
+                - Name
+      RoleARN:
+        Fn::Join:
+          - ""
+          - - "arn:"
+            - Ref: AWS::Partition
+            - ":iam::"
+            - Ref: AWS::AccountId
+            - :role/aws-service-role/ecs.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_ECSService
+      ScalableDimension: ecs:service:DesiredCount
+      ServiceNamespace: ecs
+    DependsOn:
+      - caserdsvcTaskRoleDefaultPolicy110DBBDF
+      - caserdsvcTaskRole52717DAF
+    Metadata:
+      aws:cdk:path: cas-erd-svc/cas-erd-svcService/Service/TaskCount/Target/Resource
+  caserdsvcServiceTaskCountTargetcaserdsvcCpuScaling65A24F1E:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: caserdsvccaserdsvcServiceTaskCountTargetcaserdsvcCpuScalingD5B019E3
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId:
+        Ref: caserdsvcServiceTaskCountTarget78D40BD5
+      TargetTrackingScalingPolicyConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+        TargetValue: 70
+    DependsOn:
+      - caserdsvcTaskRoleDefaultPolicy110DBBDF
+      - caserdsvcTaskRole52717DAF
+    Metadata:
+      aws:cdk:path: cas-erd-svc/cas-erd-svcService/Service/TaskCount/Target/cas-erd-svcCpuScaling/Resource
+  caserdsvcServiceTaskCountTargetcaserdsvcMemoryScaling20334CB7:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: caserdsvccaserdsvcServiceTaskCountTargetcaserdsvcMemoryScalingADE0CC2A
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId:
+        Ref: caserdsvcServiceTaskCountTarget78D40BD5
+      TargetTrackingScalingPolicyConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageMemoryUtilization
+        TargetValue: 70
+    DependsOn:
+      - caserdsvcTaskRoleDefaultPolicy110DBBDF
+      - caserdsvcTaskRole52717DAF
+    Metadata:
+      aws:cdk:path: cas-erd-svc/cas-erd-svcService/Service/TaskCount/Target/cas-erd-svcMemoryScaling/Resource
+  caserdsvcNamespaceAB729C73:
+    Type: AWS::ServiceDiscovery::PrivateDnsNamespace
+    Properties:
+      Name: caserd.local
+      Vpc: vpc-42de9927
+    Metadata:
+      aws:cdk:path: cas-erd-svc/cas-erd-svcNamespace/Resource
+  caserdsvcServiceDiscoveryC9A3AD64:
+    Type: AWS::ServiceDiscovery::Service
+    Properties:
+      DnsConfig:
+        DnsRecords:
+          - TTL: 60
+            Type: A
+        NamespaceId:
+          Fn::GetAtt:
+            - caserdsvcNamespaceAB729C73
+            - Id
+        RoutingPolicy: MULTIVALUE
+      Name: cas-erd-svc
+      NamespaceId:
+        Fn::GetAtt:
+          - caserdsvcNamespaceAB729C73
+          - Id
+    Metadata:
+      aws:cdk:path: cas-erd-svc/cas-erd-svcServiceDiscovery/Resource
+  CDKMetadata:
+    Type: AWS::CDK::Metadata
+    Properties:
+      Analytics: v2:deflate64:H4sIAAAAAAAA/31SwW7CMAz9Fu4hYz1Mu26wTZPQhij3yaSmMoSkip0iFPXfp7YDyoZ28vPLe8mLk0xnkwc9GcGBx6bYjS2tdcoFzE4tkX0MBhUc+CuhYZ2mNrJgUNONO8FXCCUIroB3M9yQIyHvWsFvxjsBchgG3I83x1CTwdZ0grkBC2vbbTv10UmjrC9Zp7kv34KPVSs+4UYR7HVaetvt0dWFt2SObdujRqHhrwpEMDjWT1VlyUCbYu6heAYLzmDxKxBaYCFjPRTrTkGurDOdbrtDn2nQD3XEgu5Hc8KD9RWEEuV8tUHbJs90ytHEQHI8S/4nXsqAzH/od9fxjYLL0RDFswFLrtTpMvg2QOe/ZvqyCmB25Mq8912mfUU0ivtJFsTG1xiOOi0C1SA4c/wBe+QK+oe/Rf/9F03TNp9RqiiNcr5AveW7Opvo+0c9GW2ZaByiE9qjXvb1G3iGrp7hAgAA
+    Metadata:
+      aws:cdk:path: cas-erd-svc/CDKMetadata/Default
+Outputs:
+  caserdsvcServiceLoadBalancerDNS42E514F2:
+    Value:
+      Fn::GetAtt:
+        - caserdsvcServiceLB5ABB90D5
+        - DNSName
+  caserdsvcServiceServiceURL299DB315:
+    Value:
+      Fn::Join:
+        - ""
+        - - http://
+          - Fn::GetAtt:
+              - caserdsvcServiceLB5ABB90D5
+              - DNSName
+  ServiceName:
+    Description: ECS Service Name
+    Value: cas-erd-svc
+    Export:
+      Name: cas-erd-svc-service-name
+  LoadBalancerDNS:
+    Description: Load Balancer DNS Name
+    Value:
+      Fn::GetAtt:
+        - caserdsvcServiceLB5ABB90D5
+        - DNSName
+    Export:
+      Name: cas-erd-svc-load-balancer-dns
+  ClusterName:
+    Description: ECS Cluster Name
+    Value: cas-erd-svc-matsonlabs-cluster
+    Export:
+      Name: cas-erd-svc-cluster-name
+Parameters:
+  BootstrapVersion:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /cdk-bootstrap/hnb659fds/version
+    Description: Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]
+

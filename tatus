@@ -1,0 +1,3 @@
+[33m535b296[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mvaluesReform[m[33m, [m[1;31morigin/valuesReform[m[33m)[m Fix help functionality and values file loading - Restore showHelp() function call in EcsServiceStack constructor - Fix values file loading in bin/cdk.ts by uncommenting YAML parsing logic - Add @types/js-yaml dependency for TypeScript support - Fix TypeScript compilation errors in test files with 'as const' assertions - Help now displays correctly with cdk deploy -c help=true - Values file deployment works with cas-erd-svc.yaml example
+[33m81555c6[m container.name
+[33m32e75cc[m interim push

@@ -1,0 +1,21 @@
+{
+  "version": "45.0.0",
+  "files": {
+    "597d86f900bb987d3be2b9ee8c5202ca51d30c9b4df194b98b9bb7c854fb8f5f": {
+      "displayName": "HelpStack Template",
+      "source": {
+        "path": "HelpStack.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "275416279984-us-west-2-844b027c": {
+          "bucketName": "cdk-hnb659fds-assets-275416279984-us-west-2",
+          "objectKey": "597d86f900bb987d3be2b9ee8c5202ca51d30c9b4df194b98b9bb7c854fb8f5f.json",
+          "region": "us-west-2",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::275416279984:role/cdk-hnb659fds-file-publishing-role-275416279984-us-west-2"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}
