@@ -124,7 +124,7 @@ describe('CDK Synthesis Integration Tests', () => {
 
       const template = Template.fromStack(stack);
 
-      // Test task role permissions
+      // Test task role permissions (matching actual CDK output)
       template.hasResourceProperties('AWS::IAM::Policy', {
         PolicyDocument: {
           Statement: [
@@ -159,7 +159,7 @@ describe('CDK Synthesis Integration Tests', () => {
             },
             {
               Effect: 'Allow',
-              Action: ['sts:AssumeRole'],
+              Action: 'sts:AssumeRole',
               Resource: '*'
             }
           ]
@@ -274,7 +274,7 @@ describe('CDK Synthesis Integration Tests', () => {
             image: 'myapp:latest',
             portMappings: [{
               containerPort: 8080,
-              protocol: 'tcp'
+              protocol: 'tcp' as const
             }],
             environment: [
               { name: 'NODE_ENV', value: 'production' },
@@ -451,7 +451,7 @@ describe('CDK Synthesis Integration Tests', () => {
             image: 'nginx:alpine',
             portMappings: [{
               containerPort: 80,
-              protocol: 'tcp'
+              protocol: 'tcp' as const
             }]
           }]
         },

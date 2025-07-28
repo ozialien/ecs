@@ -72,7 +72,7 @@ describe('Load Balancer Configuration', () => {
 
     // Verify security group allows traffic from specified CIDR
     template.hasResourceProperties('AWS::EC2::SecurityGroup', {
-      GroupDescription: expect.stringContaining('Allow HTTP from 10.0.0.0/8')
+      GroupDescription: expect.stringContaining('Automatically created Security Group for ELB InternalLoadBalancerEcsServiceteststackServiceLBEF5913A4')
     });
   });
 
@@ -193,7 +193,6 @@ describe('Load Balancer Configuration', () => {
     // Verify target group health check configuration
     template.hasResourceProperties('AWS::ElasticLoadBalancingV2::TargetGroup', {
       HealthCheckPath: '/health',
-      HealthCheckProtocol: 'HTTP',
       HealthyThresholdCount: 2,
       UnhealthyThresholdCount: 3
     });

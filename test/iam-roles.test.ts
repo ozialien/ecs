@@ -98,9 +98,20 @@ describe('IAM Roles and Permissions', () => {
 
     // Verify task execution role has secrets manager permissions
     template.hasResourceProperties('AWS::IAM::Role', {
-      ManagedPolicyArns: expect.arrayContaining([
-        expect.stringContaining('AmazonECSTaskExecutionRolePolicy')
-      ])
+      ManagedPolicyArns: [
+        {
+          'Fn::Join': [
+            '',
+            [
+              'arn:',
+              {
+                Ref: 'AWS::Partition'
+              },
+              ':iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
+            ]
+          ]
+        }
+      ]
     });
   });
 
@@ -232,9 +243,12 @@ describe('IAM Roles and Permissions', () => {
         iam: {
           taskRole: {
             custom: JSON.stringify({
-              Effect: 'Allow',
-              Action: ['custom:action'],
-              Resource: ['*']
+              Version: '2012-10-17',
+              Statement: [{
+                Effect: 'Allow',
+                Action: ['s3:GetObject'],
+                Resource: ['*']
+              }]
             })
           }
         }
